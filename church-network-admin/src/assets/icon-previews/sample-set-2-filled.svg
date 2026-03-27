@@ -1,0 +1,131 @@
+<svg width="1320" height="980" viewBox="0 0 1320 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1320" height="980" rx="28" fill="#F2F6F8"/>
+  <rect x="24" y="24" width="1272" height="932" rx="24" fill="#FFFFFF" stroke="#D7E2E8"/>
+  <text x="56" y="84" fill="#12263D" font-family="Arial, sans-serif" font-size="40" font-weight="700">Sample Set 2: Filled Dashboard Icons</text>
+  <text x="56" y="118" fill="#617587" font-family="Arial, sans-serif" font-size="20">Crisp, compact, better for small cards and mobile grids</text>
+
+  <defs>
+    <g id="card2">
+      <rect width="228" height="182" rx="22" fill="#F7FAFC" stroke="#D7E2E8"/>
+    </g>
+    <g id="star2">
+      <path d="M0 -13L3.8 -4.5L13 -3.8L5.8 2.3L8.2 11.2L0 6L-8.2 11.2L-5.8 2.3L-13 -3.8L-3.8 -4.5L0 -13Z" fill="#F6D37A"/>
+    </g>
+  </defs>
+
+  <g transform="translate(56 160)" font-family="Arial, sans-serif">
+    <g transform="translate(0 0)">
+      <use href="#card2"/>
+      <g transform="translate(70 78)">
+        <g transform="translate(-24 12) scale(0.6)">
+          <path d="M-24 18V-4L0 -20L24 -4V18H-24Z" fill="#123451"/>
+          <path d="M0 -36V-18M-10 -26H10" stroke="#F8FBFF" stroke-width="5" stroke-linecap="round"/>
+        </g>
+        <g transform="translate(24 12) scale(0.6)">
+          <path d="M-24 18V-4L0 -20L24 -4V18H-24Z" fill="#123451"/>
+          <path d="M0 -36V-18M-10 -26H10" stroke="#F8FBFF" stroke-width="5" stroke-linecap="round"/>
+        </g>
+        <path d="M80 0V-18L100 -30L120 -18V0H80Z" fill="#123451"/>
+        <path d="M100 -44V-27M92 -36H108" stroke="#F8FBFF" stroke-width="5" stroke-linecap="round"/>
+        <g transform="translate(124 -28)"><use href="#star2"/></g>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Super Admin</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Church network + star</text>
+    </g>
+    <g transform="translate(248 0)">
+      <use href="#card2"/>
+      <g transform="translate(96 82)">
+        <path d="M-28 18V-6L0 -26L28 -6V18H-28Z" fill="#1F5560"/>
+        <path d="M0 -42V-24M-10 -33H10" stroke="#F8FBFF" stroke-width="6" stroke-linecap="round"/>
+        <g transform="translate(32 -24)"><use href="#star2"/></g>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Church Admin</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Single church + star</text>
+    </g>
+    <g transform="translate(496 0)">
+      <use href="#card2"/>
+      <g transform="translate(96 82)">
+        <circle cx="0" cy="-18" r="13" fill="#2D6A4F"/>
+        <path d="M-20 24C-15 6 -7 -2 0 -2C7 -2 15 6 20 24" fill="#2D6A4F"/>
+        <circle cx="22" cy="-4" r="12" fill="#D8A34A"/>
+        <g transform="translate(22 -4) scale(0.6)"><use href="#star2"/></g>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Team Leader</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Person with badge</text>
+    </g>
+    <g transform="translate(744 0)">
+      <use href="#card2"/>
+      <g transform="translate(96 84)">
+        <circle cx="0" cy="-24" r="12" fill="#A44A39"/>
+        <path d="M-18 8C-12 -10 -6 -14 0 -14C6 -14 12 -10 18 8" fill="#A44A39"/>
+        <path d="M-26 22H26L16 -6H-16L-26 22Z" fill="#123451"/>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Pastor</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Person behind pulpit</text>
+    </g>
+    <g transform="translate(992 0)">
+      <use href="#card2"/>
+      <g transform="translate(96 82)">
+        <circle cx="0" cy="-18" r="13" fill="#D8A34A"/>
+        <path d="M-20 24C-15 6 -7 -2 0 -2C7 -2 15 6 20 24" fill="#D8A34A"/>
+        <path d="M28 -36V-18M18 -27H38" stroke="#A44A39" stroke-width="6" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Volunteer</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Person + cross</text>
+    </g>
+
+    <g transform="translate(0 214)">
+      <use href="#card2"/>
+      <g transform="translate(96 82)">
+        <circle cx="0" cy="-18" r="13" fill="#8A6B99"/>
+        <path d="M-20 24C-15 6 -7 -2 0 -2C7 -2 15 6 20 24" fill="#8A6B99"/>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Member</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Simple person</text>
+    </g>
+    <g transform="translate(248 214)">
+      <use href="#card2"/>
+      <g transform="translate(96 86)">
+        <path d="M-34 12C-12 -16 -6 -26 0 -42C6 -26 12 -16 34 12" fill="#1F5560"/>
+        <path d="M-18 14C-4 -4 -2 -10 0 -20C2 -10 4 -4 18 14" fill="#F6D37A"/>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Worship</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Raised hands</text>
+    </g>
+    <g transform="translate(496 214)">
+      <use href="#card2"/>
+      <g transform="translate(98 86)">
+        <circle cx="0" cy="-28" r="10" fill="#A44A39"/>
+        <path d="M-16 0C-10 -12 -5 -16 0 -16C5 -16 10 -12 16 0" fill="#A44A39"/>
+        <path d="M-24 24H24L14 0H-14L-24 24Z" fill="#123451"/>
+        <path d="M32 -8C46 -12 56 -2 56 8" stroke="#A44A39" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Speakers</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Speaker at pulpit</text>
+    </g>
+    <g transform="translate(744 214)">
+      <use href="#card2"/>
+      <g transform="translate(96 86)">
+        <path d="M-22 -16H22L14 18H-14L-22 -16Z" fill="#D8A34A"/>
+        <path d="M-12 -28H12" stroke="#A44A39" stroke-width="6" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="20" font-weight="700">Food</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Dish / serving bowl</text>
+    </g>
+    <g transform="translate(992 214)">
+      <use href="#card2"/>
+      <g transform="translate(94 88)">
+        <circle cx="-28" cy="-6" r="10" fill="#8CC8A8"/>
+        <circle cx="-2" cy="-10" r="10" fill="#8CC8A8"/>
+        <circle cx="22" cy="-6" r="10" fill="#8CC8A8"/>
+        <circle cx="40" cy="-20" r="11" fill="#A44A39"/>
+        <path d="M-40 22C-36 8 -31 2 -28 2C-25 2 -19 8 -15 22" fill="#8CC8A8"/>
+        <path d="M-14 18C-10 6 -5 0 -2 0C1 0 7 6 11 18" fill="#8CC8A8"/>
+        <path d="M10 22C14 8 19 2 22 2C25 2 31 8 35 22" fill="#8CC8A8"/>
+        <path d="M28 18C32 4 37 -2 40 -2C43 -2 50 4 54 18" fill="#A44A39"/>
+      </g>
+      <text x="24" y="144" fill="#12263D" font-size="18" font-weight="700">Sunday School</text>
+      <text x="24" y="166" fill="#617587" font-size="14">Children + teacher</text>
+    </g>
+  </g>
+</svg>

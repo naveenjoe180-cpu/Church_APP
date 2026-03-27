@@ -1,0 +1,157 @@
+<svg width="1320" height="980" viewBox="0 0 1320 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1320" height="980" rx="28" fill="#F7F1E4"/>
+  <rect x="24" y="24" width="1272" height="932" rx="24" fill="#FFF9F0" stroke="#DCC9A6"/>
+  <text x="56" y="84" fill="#143451" font-family="Georgia, serif" font-size="40" font-weight="700">Sample Set 1: Outline + Heritage</text>
+  <text x="56" y="118" fill="#786753" font-family="Arial, sans-serif" font-size="20">Classic church warmth, thin-line icons, soft badge cards</text>
+
+  <defs>
+    <g id="card">
+      <rect width="228" height="182" rx="22" fill="#FFFCF6" stroke="#D9C8A7"/>
+    </g>
+    <g id="star">
+      <path d="M0 -15L4.2 -4.7L15 -4L6.6 2.8L9.4 13.2L0 7.2L-9.4 13.2L-6.6 2.8L-15 -4L-4.2 -4.7L0 -15Z" fill="#D8A34A"/>
+    </g>
+    <g id="person">
+      <circle cx="0" cy="-18" r="11" stroke="#143451" stroke-width="6"/>
+      <path d="M-18 22C-14 5 -6 -2 0 -2C6 -2 14 5 18 22" stroke="#143451" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <g id="church">
+      <path d="M-26 20V-8L0 -28L26 -8V20" stroke="#143451" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M0 -48V-24M-12 -36H12" stroke="#143451" stroke-width="6" stroke-linecap="round"/>
+      <rect x="-8" y="2" width="16" height="18" rx="4" stroke="#143451" stroke-width="6"/>
+    </g>
+    <g id="pulpit">
+      <path d="M-22 18H22" stroke="#143451" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-12 18L-6 -8H6L12 18" stroke="#143451" stroke-width="6" stroke-linejoin="round"/>
+    </g>
+  </defs>
+
+  <g transform="translate(56 160)">
+    <g transform="translate(0 0)">
+      <use href="#card"/>
+      <g transform="translate(74 76)">
+        <use href="#church"/>
+        <g transform="translate(-36 18) scale(0.55)"><use href="#church"/></g>
+        <g transform="translate(36 18) scale(0.55)"><use href="#church"/></g>
+        <g transform="translate(54 -28)"><use href="#star"/></g>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Super Admin</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Group of churches + star</text>
+    </g>
+    <g transform="translate(248 0)">
+      <use href="#card"/>
+      <g transform="translate(92 76)">
+        <use href="#church"/>
+        <g transform="translate(44 -26)"><use href="#star"/></g>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Church Admin</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Church + star</text>
+    </g>
+    <g transform="translate(496 0)">
+      <use href="#card"/>
+      <g transform="translate(96 82)">
+        <use href="#person"/>
+        <circle cx="22" cy="-6" r="11" fill="#FFF9F0" stroke="#143451" stroke-width="5"/>
+        <g transform="translate(22 -6) scale(0.5)"><use href="#star"/></g>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Team Leader</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Person + star badge</text>
+    </g>
+    <g transform="translate(744 0)">
+      <use href="#card"/>
+      <g transform="translate(98 84)">
+        <circle cx="0" cy="-28" r="9" stroke="#143451" stroke-width="6"/>
+        <path d="M-12 -8C-8 -16 -4 -20 0 -20C4 -20 8 -16 12 -8" stroke="#143451" stroke-width="6" stroke-linecap="round"/>
+        <path d="M26 -16C36 -18 42 -12 42 -4" stroke="#A44A39" stroke-width="5" stroke-linecap="round"/>
+        <path d="M32 -24C46 -27 56 -16 56 -4" stroke="#A44A39" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="-28" cy="10" r="7" stroke="#2D6A4F" stroke-width="5"/>
+        <circle cx="0" cy="14" r="7" stroke="#2D6A4F" stroke-width="5"/>
+        <circle cx="28" cy="10" r="7" stroke="#2D6A4F" stroke-width="5"/>
+        <path d="M-38 30C-34 20 -31 17 -28 17C-25 17 -20 20 -16 30" stroke="#2D6A4F" stroke-width="5" stroke-linecap="round"/>
+        <path d="M-10 34C-6 24 -3 21 0 21C3 21 8 24 12 34" stroke="#2D6A4F" stroke-width="5" stroke-linecap="round"/>
+        <path d="M18 30C22 20 25 17 28 17C31 17 36 20 40 30" stroke="#2D6A4F" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Pastor</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Speaking in front of people</text>
+    </g>
+    <g transform="translate(992 0)">
+      <use href="#card"/>
+      <g transform="translate(96 82)">
+        <use href="#person"/>
+        <path d="M28 -34V-16M18 -25H38" stroke="#A44A39" stroke-width="6" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Volunteer</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Person + cross</text>
+    </g>
+
+    <g transform="translate(0 214)">
+      <use href="#card"/>
+      <g transform="translate(96 84)"><use href="#person"/></g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Member</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Simple person icon</text>
+    </g>
+    <g transform="translate(248 214)">
+      <use href="#card"/>
+      <g transform="translate(96 84)">
+        <circle cx="-24" cy="-18" r="8" stroke="#143451" stroke-width="5"/>
+        <circle cx="0" cy="-24" r="8" stroke="#143451" stroke-width="5"/>
+        <circle cx="24" cy="-18" r="8" stroke="#143451" stroke-width="5"/>
+        <path d="M-34 16C-30 4 -27 -2 -24 -2C-21 -2 -16 4 -12 16" stroke="#143451" stroke-width="5" stroke-linecap="round"/>
+        <path d="M-10 8C-6 -4 -3 -10 0 -10C3 -10 7 -4 10 8" stroke="#143451" stroke-width="5" stroke-linecap="round"/>
+        <path d="M14 16C18 4 21 -2 24 -2C27 -2 32 4 36 16" stroke="#143451" stroke-width="5" stroke-linecap="round"/>
+        <path d="M-18 10L-14 -6L-8 10" stroke="#D8A34A" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6 12L12 -10" stroke="#A44A39" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="14" cy="-14" r="4.5" stroke="#A44A39" stroke-width="3.5"/>
+        <path d="M-42 -12C-34 -18 -28 -18 -20 -12" stroke="#2D6A4F" stroke-width="4" stroke-linecap="round"/>
+        <path d="M-6 -38C0 -44 6 -44 12 -38" stroke="#2D6A4F" stroke-width="4" stroke-linecap="round"/>
+        <path d="M18 -12C26 -18 32 -18 40 -12" stroke="#2D6A4F" stroke-width="4" stroke-linecap="round"/>
+        <path d="M-30 28H30" stroke="#C9B18A" stroke-width="4" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Worship</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Choir singing</text>
+    </g>
+    <g transform="translate(496 214)">
+      <use href="#card"/>
+      <g transform="translate(98 84)">
+        <circle cx="0" cy="-28" r="9" stroke="#143451" stroke-width="6"/>
+        <path d="M-12 -8C-8 -16 -4 -20 0 -20C4 -20 8 -16 12 -8" stroke="#143451" stroke-width="6" stroke-linecap="round"/>
+        <path d="M-20 20H20L12 -2H-12L-20 20Z" stroke="#143451" stroke-width="6" stroke-linejoin="round"/>
+        <path d="M-6 -4V8" stroke="#143451" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="-6" cy="-8" r="3" fill="#143451"/>
+        <path d="M24 -16C34 -18 40 -12 40 -4" stroke="#A44A39" stroke-width="5" stroke-linecap="round"/>
+        <path d="M30 -24C44 -27 54 -16 54 -4" stroke="#A44A39" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Speakers</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Talking at a pulpit</text>
+    </g>
+    <g transform="translate(744 214)">
+      <use href="#card"/>
+      <g transform="translate(98 86)">
+        <circle cx="0" cy="0" r="24" stroke="#143451" stroke-width="6"/>
+        <circle cx="0" cy="0" r="13" stroke="#D8A34A" stroke-width="5"/>
+        <path d="M-42 -18V24" stroke="#A44A39" stroke-width="6" stroke-linecap="round"/>
+        <path d="M-50 -18H-34" stroke="#A44A39" stroke-width="6" stroke-linecap="round"/>
+        <path d="M-50 -4H-36" stroke="#A44A39" stroke-width="6" stroke-linecap="round"/>
+        <path d="M38 -18V24" stroke="#143451" stroke-width="6" stroke-linecap="round"/>
+        <ellipse cx="38" cy="-16" rx="6" ry="4" stroke="#143451" stroke-width="5"/>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Food</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Plate with spoon and fork</text>
+    </g>
+    <g transform="translate(992 214)">
+      <use href="#card"/>
+      <g transform="translate(98 88)">
+        <circle cx="-28" cy="-6" r="10" stroke="#143451" stroke-width="5"/>
+        <circle cx="-4" cy="-10" r="10" stroke="#143451" stroke-width="5"/>
+        <circle cx="18" cy="-6" r="10" stroke="#143451" stroke-width="5"/>
+        <circle cx="36" cy="-18" r="11" stroke="#A44A39" stroke-width="5"/>
+        <path d="M-40 22C-36 8 -30 2 -28 2C-25 2 -18 8 -14 22" stroke="#143451" stroke-width="5" stroke-linecap="round"/>
+        <path d="M-16 18C-12 6 -7 0 -4 0C-1 0 5 6 9 18" stroke="#143451" stroke-width="5" stroke-linecap="round"/>
+        <path d="M8 22C12 8 16 2 18 2C22 2 28 8 32 22" stroke="#143451" stroke-width="5" stroke-linecap="round"/>
+        <path d="M26 18C30 2 34 -4 36 -4C40 -4 46 4 50 18" stroke="#A44A39" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <text x="24" y="144" fill="#143451" font-family="Arial, sans-serif" font-size="18" font-weight="700">Sunday School</text>
+      <text x="24" y="166" fill="#786753" font-family="Arial, sans-serif" font-size="14">Children + teacher</text>
+    </g>
+  </g>
+</svg>

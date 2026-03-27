@@ -1,0 +1,73 @@
+<svg width="1280" height="380" viewBox="0 0 1280 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="380" rx="28" fill="#F4F6F8"/>
+  <rect x="20" y="20" width="1240" height="340" rx="24" fill="#FBFDFF" stroke="#CCD6E0"/>
+  <text x="48" y="70" fill="#143451" font-family="Georgia, serif" font-size="34" font-weight="700">Team Icons B</text>
+  <text x="48" y="102" fill="#617385" font-family="Arial, sans-serif" font-size="18">Structured modern outline set with simpler geometry</text>
+
+  <defs>
+    <g id="cardb">
+      <rect width="220" height="210" rx="22" fill="#FFFFFF" stroke="#D5DEE7"/>
+    </g>
+  </defs>
+
+  <g transform="translate(44 126)" stroke="#143451" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(0 0)">
+      <use href="#cardb" stroke="none"/>
+      <circle cx="80" cy="70" r="10"/>
+      <circle cx="110" cy="60" r="10"/>
+      <circle cx="140" cy="70" r="10"/>
+      <path d="M64 112C68 94 74 84 80 84C86 84 92 94 96 112"/>
+      <path d="M96 104C100 86 106 76 110 76C114 76 120 86 124 104"/>
+      <path d="M124 112C128 94 134 84 140 84C146 84 152 94 156 112"/>
+      <path d="M112 96L118 74"/>
+      <circle cx="120" cy="70" r="4"/>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700" stroke="none">Worship Team</text>
+    </g>
+
+    <g transform="translate(236 0)">
+      <use href="#cardb" stroke="none"/>
+      <circle cx="102" cy="58" r="10"/>
+      <path d="M90 86H114L108 64H96L90 86Z"/>
+      <path d="M102 76V94"/>
+      <path d="M126 58C136 54 144 58 146 68"/>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700" stroke="none">Speakers Team</text>
+    </g>
+
+    <g transform="translate(472 0)">
+      <use href="#cardb" stroke="none"/>
+      <rect x="72" y="54" width="38" height="24" rx="4"/>
+      <path d="M82 86H100"/>
+      <path d="M91 78V86"/>
+      <circle cx="132" cy="64" r="7"/>
+      <circle cx="154" cy="64" r="7"/>
+      <path d="M132 78V100"/>
+      <path d="M154 78V100"/>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700" stroke="none">Tech Team</text>
+    </g>
+
+    <g transform="translate(708 0)">
+      <use href="#cardb" stroke="none"/>
+      <circle cx="76" cy="72" r="8"/>
+      <circle cx="102" cy="64" r="8"/>
+      <circle cx="128" cy="72" r="8"/>
+      <circle cx="152" cy="54" r="9"/>
+      <path d="M64 108C68 92 72 84 76 84C80 84 84 92 88 108"/>
+      <path d="M90 100C94 84 98 76 102 76C106 76 110 84 114 100"/>
+      <path d="M116 108C120 92 124 84 128 84C132 84 136 92 140 108"/>
+      <path d="M142 98C146 82 149 74 152 74C156 74 160 82 164 98"/>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700" stroke="none">Sunday School Team</text>
+    </g>
+
+    <g transform="translate(944 0)">
+      <use href="#cardb" stroke="none"/>
+      <circle cx="98" cy="78" r="20"/>
+      <circle cx="98" cy="78" r="10"/>
+      <path d="M66 54V100"/>
+      <path d="M60 54H72"/>
+      <path d="M60 68H70"/>
+      <path d="M136 54V100"/>
+      <ellipse cx="136" cy="52" rx="5" ry="3"/>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700" stroke="none">Food Team</text>
+    </g>
+  </g>
+</svg>

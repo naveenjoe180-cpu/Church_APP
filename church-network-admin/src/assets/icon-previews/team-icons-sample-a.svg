@@ -1,0 +1,97 @@
+<svg width="1280" height="380" viewBox="0 0 1280 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="380" rx="28" fill="#F6EFE1"/>
+  <rect x="20" y="20" width="1240" height="340" rx="24" fill="#FFF9F0" stroke="#D9C8A7"/>
+  <text x="48" y="70" fill="#143451" font-family="Georgia, serif" font-size="34" font-weight="700">Team Icons A</text>
+  <text x="48" y="102" fill="#7C6A56" font-family="Arial, sans-serif" font-size="18">Classic outline set with warm heritage shapes</text>
+
+  <defs>
+    <g id="card">
+      <rect width="220" height="210" rx="22" fill="#FFFCF6" stroke="#DDCCAB"/>
+    </g>
+  </defs>
+
+  <g transform="translate(44 126)">
+    <g transform="translate(0 0)">
+      <use href="#card"/>
+      <g transform="translate(110 78)" stroke="#143451" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <circle cx="-30" cy="-10" r="9"/>
+        <circle cx="0" cy="-18" r="9"/>
+        <circle cx="30" cy="-10" r="9"/>
+        <path d="M-42 36C-38 20 -34 12 -30 12C-26 12 -20 20 -16 36"/>
+        <path d="M-12 28C-8 10 -4 2 0 2C4 2 9 10 12 28"/>
+        <path d="M18 36C22 20 26 12 30 12C34 12 40 20 44 36"/>
+        <path d="M-6 22L0 0L6 22"/>
+        <path d="M20 24L28 0"/>
+        <circle cx="31" cy="-5" r="4"/>
+        <path d="M-50 -4C-42 -10 -36 -10 -28 -4"/>
+        <path d="M-8 -26C-2 -32 4 -32 10 -26"/>
+        <path d="M24 -4C32 -10 38 -10 46 -4"/>
+      </g>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Worship Team</text>
+      <text x="24" y="189" fill="#7C6A56" font-family="Arial, sans-serif" font-size="14">Choir and musicians</text>
+    </g>
+
+    <g transform="translate(236 0)">
+      <use href="#card"/>
+      <g transform="translate(110 80)" stroke="#143451" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <circle cx="0" cy="-28" r="10"/>
+        <path d="M-12 -6C-8 -16 -4 -20 0 -20C4 -20 8 -16 12 -6"/>
+        <path d="M-22 24H22L14 2H-14L-22 24Z"/>
+        <path d="M0 0V14"/>
+        <circle cx="0" cy="-4" r="3" fill="#143451" stroke="none"/>
+        <path d="M26 -14C36 -18 42 -12 42 -4"/>
+        <path d="M32 -22C46 -26 56 -16 56 -4"/>
+      </g>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Speakers Team</text>
+      <text x="24" y="189" fill="#7C6A56" font-family="Arial, sans-serif" font-size="14">Pulpit and voice</text>
+    </g>
+
+    <g transform="translate(472 0)">
+      <use href="#card"/>
+      <g transform="translate(110 84)" stroke="#143451" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <rect x="-36" y="-22" width="34" height="22" rx="4"/>
+        <path d="M-24 8H-14"/>
+        <path d="M-19 0V8"/>
+        <circle cx="20" cy="-6" r="7"/>
+        <circle cx="40" cy="-6" r="7"/>
+        <path d="M20 8V28"/>
+        <path d="M40 8V28"/>
+        <path d="M14 18H26"/>
+        <path d="M34 10H46"/>
+      </g>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Tech Team</text>
+      <text x="24" y="189" fill="#7C6A56" font-family="Arial, sans-serif" font-size="14">Projection and sound</text>
+    </g>
+
+    <g transform="translate(708 0)">
+      <use href="#card"/>
+      <g transform="translate(110 84)" stroke="#143451" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <circle cx="-34" cy="-4" r="8"/>
+        <circle cx="-10" cy="-10" r="8"/>
+        <circle cx="14" cy="-4" r="8"/>
+        <circle cx="38" cy="-18" r="9"/>
+        <path d="M-46 28C-42 14 -38 8 -34 8C-30 8 -24 14 -20 28"/>
+        <path d="M-22 24C-18 10 -14 4 -10 4C-6 4 -1 10 3 24"/>
+        <path d="M2 28C6 14 10 8 14 8C18 8 24 14 28 28"/>
+        <path d="M26 24C30 8 34 2 38 2C42 2 48 8 52 24"/>
+      </g>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Sunday School Team</text>
+      <text x="24" y="189" fill="#7C6A56" font-family="Arial, sans-serif" font-size="14">Teacher and children</text>
+    </g>
+
+    <g transform="translate(944 0)">
+      <use href="#card"/>
+      <g transform="translate(110 84)" stroke="#143451" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <circle cx="0" cy="0" r="22"/>
+        <circle cx="0" cy="0" r="12"/>
+        <path d="M-42 -18V24"/>
+        <path d="M-50 -18H-34"/>
+        <path d="M-50 -4H-36"/>
+        <path d="M38 -18V24"/>
+        <ellipse cx="38" cy="-16" rx="6" ry="4"/>
+      </g>
+      <text x="24" y="166" fill="#143451" font-family="Arial, sans-serif" font-size="20" font-weight="700">Food Team</text>
+      <text x="24" y="189" fill="#7C6A56" font-family="Arial, sans-serif" font-size="14">Plate and cutlery</text>
+    </g>
+  </g>
+</svg>

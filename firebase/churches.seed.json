@@ -1,0 +1,178 @@
+[
+  {
+    "id": "berlin",
+    "data": {
+      "name": "BIPC Berlin",
+      "city": "Potsdam, Germany",
+      "displayCity": "Berlin",
+      "country": "Germany",
+      "address": "Schilfhof 24, 14478 Potsdam",
+      "serviceTimes": "Sunday 11:00",
+      "googleMapsLabel": "Bethel International Pentecostal Church (B.I.P.C), Berlin",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Berlin / Shared",
+      "teams": ["Worship Team", "Speakers Team", "Food Team", "Sunday School Team"],
+      "admins": 2,
+      "members": 146,
+      "isPublic": true,
+      "sortOrder": 2
+    }
+  },
+  {
+    "id": "cologne",
+    "data": {
+      "name": "BIPC Cologne",
+      "city": "Bergisch Gladbach, Germany",
+      "displayCity": "Cologne",
+      "country": "Germany",
+      "address": "Martin-Luther-Strasse 13, 51469 Bergisch Gladbach",
+      "serviceTimes": "Sunday 10:00",
+      "googleMapsLabel": "Bethel International Pentecostal Church (B.I.P.C.) Bergisch Gladbach",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Cologne / Shared",
+      "teams": ["Worship Team", "Speakers Team", "Food Team", "Sunday School Team"],
+      "admins": 3,
+      "members": 214,
+      "isPublic": true,
+      "sortOrder": 1
+    }
+  },
+  {
+    "id": "frankfurt",
+    "data": {
+      "name": "BIPC Frankfurt",
+      "city": "Hanau, Germany",
+      "displayCity": "Frankfurt",
+      "country": "Germany",
+      "address": "Hindemithstrasse 32, 63452 Hanau",
+      "serviceTimes": "Sunday 16:00",
+      "googleMapsLabel": "Bethel International Pentecostal Church Hanau",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Frankfurt / Shared",
+      "teams": ["Worship Team", "Speakers Team", "Food Team", "Sunday School Team"],
+      "admins": 4,
+      "members": 308,
+      "isPublic": true,
+      "sortOrder": 3
+    }
+  },
+  {
+    "id": "freiburg",
+    "data": {
+      "name": "BIPC Freiburg im Breisgau",
+      "city": "Freiburg im Breisgau, Germany",
+      "displayCity": "Freiburg im Breisgau",
+      "country": "Germany",
+      "address": "Engesserstrasse 13, 79108 Freiburg im Breisgau",
+      "serviceTimes": "Sunday 14:00",
+      "googleMapsLabel": "Bethel International Pentecostal Church Freiburg im Breisgau",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Freiburg / Shared",
+      "teams": ["Worship Team", "Food Team"],
+      "admins": 1,
+      "members": 72,
+      "isPublic": true,
+      "sortOrder": 6
+    }
+  },
+  {
+    "id": "leipzig",
+    "data": {
+      "name": "BIPC Leipzig",
+      "city": "Leipzig, Germany",
+      "displayCity": "Leipzig",
+      "country": "Germany",
+      "address": "Puschstrasse 9, 04103 Leipzig",
+      "serviceTimes": "Sunday 09:30",
+      "googleMapsLabel": "Bethel International Pentecostal Church at Leipzig",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Leipzig / Shared",
+      "teams": ["Worship Team", "Speakers Team", "Food Team", "Sunday School Team"],
+      "admins": 1,
+      "members": 68,
+      "isPublic": true,
+      "sortOrder": 8
+    }
+  },
+  {
+    "id": "nuremberg",
+    "data": {
+      "name": "BIPC Nuremberg",
+      "city": "Erlangen, Germany",
+      "displayCity": "Nuremberg",
+      "country": "Germany",
+      "address": "Suedliche Stadtmauerstrasse 21, 91054 Erlangen",
+      "serviceTimes": "Sunday 10:00",
+      "googleMapsLabel": "Bethel International Pentecostal Church Erlangen",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Nuremberg / Shared",
+      "teams": ["Worship Team", "Speakers Team"],
+      "admins": 2,
+      "members": 134,
+      "isPublic": true,
+      "sortOrder": 5
+    }
+  },
+  {
+    "id": "osnabruck",
+    "data": {
+      "name": "BIPC Osnabrueck",
+      "city": "Osnabrueck, Germany",
+      "displayCity": "Osnabrueck",
+      "country": "Germany",
+      "address": "Koksche Str. 74, 49080 Osnabrueck",
+      "serviceTimes": "Sunday 15:00",
+      "googleMapsLabel": "Bethel International Pentecostal Church Osnabruck",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Osnabrueck / Shared",
+      "teams": ["Worship Team", "Speakers Team"],
+      "admins": 1,
+      "members": 84,
+      "isPublic": true,
+      "sortOrder": 7
+    }
+  },
+  {
+    "id": "stuttgart",
+    "data": {
+      "name": "BIPC Stuttgart",
+      "city": "Boeblingen, Germany",
+      "displayCity": "Stuttgart",
+      "country": "Germany",
+      "address": "FeG Boeblingen, Hanns-Klemm-Strasse 9, 71034 Boeblingen",
+      "serviceTimes": "Sunday 14:00",
+      "googleMapsLabel": "Bethel International Pentecostal Church (B.I.P.C), Boeblingen",
+      "contactEmail": "info@bethel-pentecostal.org",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "networkYoutubeUrl": "https://www.youtube.com/@bipcgermany",
+      "sharedDrivePath": "Church Network / Stuttgart / Shared",
+      "teams": ["Worship Team", "Speakers Team", "Food Team"],
+      "admins": 2,
+      "members": 171,
+      "isPublic": true,
+      "sortOrder": 4
+    }
+  }
+]

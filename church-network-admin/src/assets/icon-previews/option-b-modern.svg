@@ -1,0 +1,79 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="760" rx="32" fill="#F3F6F8"/>
+  <rect x="28" y="28" width="1144" height="704" rx="28" fill="#FFFFFF" stroke="#D7E0E7"/>
+  <text x="64" y="92" fill="#12263D" font-family="Arial, sans-serif" font-size="42" font-weight="700">Option B: Modern Tokens</text>
+  <text x="64" y="126" fill="#5D7081" font-family="Arial, sans-serif" font-size="22">Clean circles, dashboard-friendly, quick to scan on small tiles</text>
+
+  <text x="64" y="190" fill="#12263D" font-family="Arial, sans-serif" font-size="28" font-weight="700">Roles</text>
+  <text x="64" y="438" fill="#12263D" font-family="Arial, sans-serif" font-size="28" font-weight="700">Teams</text>
+
+  <g transform="translate(64 220)">
+    <g transform="translate(0 0)">
+      <rect width="190" height="170" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="95" cy="68" r="34" fill="#123451"/>
+      <path d="M95 48V88M75 68H115" stroke="#F8FBFF" stroke-width="8" stroke-linecap="round"/>
+      <text x="95" y="124" text-anchor="middle" fill="#12263D" font-family="Arial, sans-serif" font-size="18" font-weight="700">Super Admin</text>
+    </g>
+    <g transform="translate(208 0)">
+      <rect width="190" height="170" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="95" cy="68" r="34" fill="#1F5560"/>
+      <rect x="75" y="54" width="40" height="28" rx="8" fill="#F8FBFF"/>
+      <path d="M95 42V56" stroke="#F8FBFF" stroke-width="7" stroke-linecap="round"/>
+      <text x="95" y="124" text-anchor="middle" fill="#12263D" font-family="Arial, sans-serif" font-size="18" font-weight="700">Church Admin</text>
+    </g>
+    <g transform="translate(416 0)">
+      <rect width="190" height="170" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="95" cy="68" r="34" fill="#2D6A4F"/>
+      <path d="M76 78L94 56L114 78" stroke="#F8FBFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="95" y="124" text-anchor="middle" fill="#12263D" font-family="Arial, sans-serif" font-size="18" font-weight="700">Team Leader</text>
+    </g>
+    <g transform="translate(624 0)">
+      <rect width="190" height="170" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="95" cy="68" r="34" fill="#D8A34A"/>
+      <circle cx="84" cy="62" r="8" fill="#F8FBFF"/>
+      <circle cx="106" cy="62" r="8" fill="#F8FBFF"/>
+      <path d="M79 80C84 73 90 71 95 71C100 71 106 73 111 80" stroke="#F8FBFF" stroke-width="7" stroke-linecap="round"/>
+      <text x="95" y="124" text-anchor="middle" fill="#12263D" font-family="Arial, sans-serif" font-size="18" font-weight="700">Volunteer</text>
+    </g>
+    <g transform="translate(832 0)">
+      <rect width="190" height="170" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="95" cy="68" r="34" fill="#8A6B99"/>
+      <circle cx="95" cy="60" r="10" fill="#F8FBFF"/>
+      <path d="M77 84C83 76 88 73 95 73C102 73 107 76 113 84" stroke="#F8FBFF" stroke-width="7" stroke-linecap="round"/>
+      <text x="95" y="124" text-anchor="middle" fill="#12263D" font-family="Arial, sans-serif" font-size="18" font-weight="700">Member</text>
+    </g>
+  </g>
+
+  <g transform="translate(64 470)">
+    <g transform="translate(0 0)">
+      <rect width="240" height="180" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="62" cy="64" r="28" fill="#1F5560"/>
+      <path d="M48 70C55 61 57 53 62 45C67 53 69 61 76 70" stroke="#F8FBFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="118" y="74" fill="#12263D" font-family="Arial, sans-serif" font-size="22" font-weight="700">Worship</text>
+      <text x="28" y="132" fill="#5D7081" font-family="Arial, sans-serif" font-size="18">Modern music mark for singers and instruments</text>
+    </g>
+    <g transform="translate(260 0)">
+      <rect width="240" height="180" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="62" cy="64" r="28" fill="#A44A39"/>
+      <path d="M48 78L72 48" stroke="#F8FBFF" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="76" cy="44" r="7" fill="#F8FBFF"/>
+      <text x="118" y="74" fill="#12263D" font-family="Arial, sans-serif" font-size="22" font-weight="700">Speakers</text>
+      <text x="28" y="132" fill="#5D7081" font-family="Arial, sans-serif" font-size="18">Voice icon, clean enough for compact dashboards</text>
+    </g>
+    <g transform="translate(520 0)">
+      <rect width="240" height="180" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="62" cy="64" r="28" fill="#D8A34A"/>
+      <path d="M52 50H72L66 80H58L52 50Z" fill="#F8FBFF"/>
+      <text x="118" y="74" fill="#12263D" font-family="Arial, sans-serif" font-size="22" font-weight="700">Food</text>
+      <text x="28" y="132" fill="#5D7081" font-family="Arial, sans-serif" font-size="18">Simple serving icon for hospitality teams</text>
+    </g>
+    <g transform="translate(780 0)">
+      <rect width="240" height="180" rx="24" fill="#F7FAFC" stroke="#D7E0E7"/>
+      <circle cx="62" cy="64" r="28" fill="#2D6A4F"/>
+      <rect x="48" y="48" width="28" height="32" rx="5" fill="#F8FBFF"/>
+      <path d="M52 57H72M52 65H68M52 73H65" stroke="#2D6A4F" stroke-width="3.5" stroke-linecap="round"/>
+      <text x="118" y="74" fill="#12263D" font-family="Arial, sans-serif" font-size="22" font-weight="700">Sunday School</text>
+      <text x="28" y="132" fill="#5D7081" font-family="Arial, sans-serif" font-size="18">Friendly lesson-card look for teaching teams</text>
+    </g>
+  </g>
+</svg>

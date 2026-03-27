@@ -1,0 +1,88 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF6E8"/>
+      <stop offset="1" stop-color="#F3F7FB"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="760" rx="32" fill="url(#bg)"/>
+  <rect x="28" y="28" width="1144" height="704" rx="28" fill="#FFFFFF" fill-opacity="0.82" stroke="#E2D7C1"/>
+  <text x="64" y="92" fill="#143451" font-family="Georgia, serif" font-size="42" font-weight="700">Option C: Celebration Marks</text>
+  <text x="64" y="126" fill="#746453" font-family="Arial, sans-serif" font-size="22">More expressive, event-like, stronger visual personality</text>
+
+  <text x="64" y="190" fill="#143451" font-family="Arial, sans-serif" font-size="28" font-weight="700">Roles</text>
+  <text x="64" y="438" fill="#143451" font-family="Arial, sans-serif" font-size="28" font-weight="700">Teams</text>
+
+  <g transform="translate(64 220)">
+    <g transform="translate(0 0)">
+      <rect width="190" height="170" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="95" cy="68" r="34" fill="#143451"/>
+      <path d="M95 45L100 61H116L103 71L108 87L95 77L82 87L87 71L74 61H90L95 45Z" fill="#F7D392"/>
+      <text x="95" y="124" text-anchor="middle" fill="#143451" font-family="Arial, sans-serif" font-size="18" font-weight="700">Super Admin</text>
+    </g>
+    <g transform="translate(208 0)">
+      <rect width="190" height="170" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="95" cy="68" r="34" fill="#A44A39"/>
+      <path d="M95 48V90M75 70H115" stroke="#FFF7F2" stroke-width="8" stroke-linecap="round"/>
+      <rect x="81" y="82" width="28" height="18" rx="6" fill="#FFF7F2"/>
+      <text x="95" y="124" text-anchor="middle" fill="#143451" font-family="Arial, sans-serif" font-size="18" font-weight="700">Church Admin</text>
+    </g>
+    <g transform="translate(416 0)">
+      <rect width="190" height="170" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="95" cy="68" r="34" fill="#2D6A4F"/>
+      <path d="M77 78L95 52L113 78" stroke="#FFF7F2" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="95" cy="84" r="6" fill="#FFF7F2"/>
+      <text x="95" y="124" text-anchor="middle" fill="#143451" font-family="Arial, sans-serif" font-size="18" font-weight="700">Team Leader</text>
+    </g>
+    <g transform="translate(624 0)">
+      <rect width="190" height="170" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="95" cy="68" r="34" fill="#D8A34A"/>
+      <circle cx="81" cy="68" r="8" fill="#FFF7F2"/>
+      <circle cx="109" cy="68" r="8" fill="#FFF7F2"/>
+      <circle cx="95" cy="52" r="8" fill="#FFF7F2"/>
+      <path d="M81 82H109" stroke="#FFF7F2" stroke-width="7" stroke-linecap="round"/>
+      <text x="95" y="124" text-anchor="middle" fill="#143451" font-family="Arial, sans-serif" font-size="18" font-weight="700">Volunteer</text>
+    </g>
+    <g transform="translate(832 0)">
+      <rect width="190" height="170" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="95" cy="68" r="34" fill="#8C6E8B"/>
+      <path d="M95 52C102 52 108 58 108 65C108 80 95 92 95 92C95 92 82 80 82 65C82 58 88 52 95 52Z" fill="#FFF7F2"/>
+      <text x="95" y="124" text-anchor="middle" fill="#143451" font-family="Arial, sans-serif" font-size="18" font-weight="700">Member</text>
+    </g>
+  </g>
+
+  <g transform="translate(64 470)">
+    <g transform="translate(0 0)">
+      <rect width="240" height="180" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="62" cy="64" r="28" fill="#1F5560"/>
+      <path d="M44 75C52 63 54 52 62 44C70 52 72 63 80 75" stroke="#FFF7F2" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="62" cy="56" r="5" fill="#FFF7F2"/>
+      <text x="118" y="74" fill="#143451" font-family="Arial, sans-serif" font-size="22" font-weight="700">Worship</text>
+      <text x="28" y="132" fill="#746453" font-family="Arial, sans-serif" font-size="18">Expressive dove-flame style for music ministry</text>
+    </g>
+    <g transform="translate(260 0)">
+      <rect width="240" height="180" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="62" cy="64" r="28" fill="#A44A39"/>
+      <path d="M46 78L74 50" stroke="#FFF7F2" stroke-width="7" stroke-linecap="round"/>
+      <path d="M72 48L80 40" stroke="#FFF7F2" stroke-width="7" stroke-linecap="round"/>
+      <text x="118" y="74" fill="#143451" font-family="Arial, sans-serif" font-size="22" font-weight="700">Speakers</text>
+      <text x="28" y="132" fill="#746453" font-family="Arial, sans-serif" font-size="18">Lively microphone line with a stage feel</text>
+    </g>
+    <g transform="translate(520 0)">
+      <rect width="240" height="180" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="62" cy="64" r="28" fill="#D8A34A"/>
+      <path d="M49 54H75L68 82H56L49 54Z" fill="#FFF7F2"/>
+      <path d="M54 46H70" stroke="#FFF7F2" stroke-width="6" stroke-linecap="round"/>
+      <text x="118" y="74" fill="#143451" font-family="Arial, sans-serif" font-size="22" font-weight="700">Food</text>
+      <text x="28" y="132" fill="#746453" font-family="Arial, sans-serif" font-size="18">Serving cup with a celebratory hospitality tone</text>
+    </g>
+    <g transform="translate(780 0)">
+      <rect width="240" height="180" rx="24" fill="#FFF9F0" stroke="#E2D7C1"/>
+      <circle cx="62" cy="64" r="28" fill="#2D6A4F"/>
+      <rect x="48" y="47" width="28" height="34" rx="5" fill="#FFF7F2"/>
+      <path d="M52 56H72M52 64H68M52 72H64" stroke="#2D6A4F" stroke-width="3.5" stroke-linecap="round"/>
+      <text x="118" y="74" fill="#143451" font-family="Arial, sans-serif" font-size="22" font-weight="700">Sunday School</text>
+      <text x="28" y="132" fill="#746453" font-family="Arial, sans-serif" font-size="18">Warm classroom icon with more character</text>
+    </g>
+  </g>
+</svg>
