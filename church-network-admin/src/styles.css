@@ -328,6 +328,7 @@ label {
 }
 
 .scope-card-primary {
+  grid-column: 1 / -1;
   background:
     radial-gradient(circle at top right, rgba(216, 163, 74, 0.18), transparent 26%),
     linear-gradient(135deg, rgba(20, 46, 71, 0.97), rgba(27, 84, 90, 0.95));
@@ -467,6 +468,21 @@ label {
 
 .overview-grid .hero-card {
   grid-column: span 12;
+}
+
+.overview-grid .overview-scope-card {
+  grid-column: span 4;
+  align-content: start;
+  min-height: 100%;
+}
+
+.overview-grid .overview-hero-card {
+  grid-column: span 8;
+}
+
+.overview-grid .overview-scope-card .scope-card-copy,
+.overview-grid .overview-hero-card p {
+  line-height: 1.5;
 }
 
 .overview-grid .metric-card {
@@ -1078,10 +1094,13 @@ label {
 }
 
 .planning-role-team-icon-shell svg {
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
+  display: block;
   overflow: visible;
   flex: 0 0 auto;
+  transform: translateY(8px);
+  transform-origin: center;
 }
 
 .planning-role-team-count {
@@ -1209,6 +1228,39 @@ label {
   flex-wrap: wrap;
 }
 
+.planning-archive-loaded {
+  display: grid;
+  gap: 16px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(18, 38, 61, 0.08);
+}
+
+.planning-archive-loaded .section-heading {
+  align-items: center;
+}
+
+.planning-archive-loaded .section-heading .detail-copy {
+  margin: 8px 0 0;
+  color: rgba(18, 38, 61, 0.7);
+  line-height: 1.45;
+}
+
+.archive-loaded-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(31, 85, 96, 0.12), rgba(47, 123, 136, 0.18));
+  border: 1px solid rgba(31, 85, 96, 0.24);
+  color: var(--navy);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .planning-sunday-card,
 .planning-archive-card {
   border: 1px solid var(--line);
@@ -1324,6 +1376,14 @@ label {
 
 .planning-activity-toggle.archive-static {
   cursor: default;
+}
+
+.planning-archive-toggle {
+  cursor: pointer;
+}
+
+.planning-archive-toggle:hover .planning-activity-chevron {
+  background: rgba(18, 38, 61, 0.12);
 }
 
 .planning-activity-chevron {
@@ -1457,17 +1517,49 @@ label {
 }
 
 .planning-activity-picker {
-  grid-template-columns: minmax(220px, 1fr) minmax(240px, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding: 14px;
+  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.15fr) auto;
+  align-items: stretch;
+  gap: 20px;
+  padding: 20px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(18, 38, 61, 0.08);
 }
 
+.planning-activity-field,
+.planning-activity-action {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(247, 241, 230, 0.7);
+  border: 1px solid rgba(191, 165, 119, 0.2);
+  min-width: 0;
+}
+
+.planning-activity-field .auth-label,
+.planning-activity-action-label {
+  margin: 0;
+  color: rgba(18, 38, 61, 0.72);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.planning-activity-picker .auth-input {
+  min-height: 52px;
+}
+
+.planning-activity-action {
+  align-content: end;
+  min-width: 148px;
+}
+
 .planning-activity-picker .action-button {
-  justify-self: end;
+  justify-self: stretch;
+  align-self: end;
+  min-width: 118px;
 }
 
 .planning-activity-workbench {
@@ -1511,11 +1603,19 @@ label {
 }
 
 .planning-order-toggle {
-  min-height: 34px;
-  padding: 7px 12px;
+  min-height: 32px;
+  min-width: 96px;
+  max-width: 104px;
+  padding: 6px 10px;
   border-radius: 12px;
-  font-size: 0.8rem;
-  line-height: 1.1;
+  font-size: 0.78rem;
+  line-height: 1.05;
+  white-space: normal;
+  text-align: center;
+}
+
+.planning-order-toggle span {
+  display: block;
 }
 
 .planning-workbench-grid {

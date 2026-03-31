@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { firebaseConfigStatus, firestoreDb, isFirebaseConfigured } from './config/firebase';
@@ -240,8 +240,99 @@ function getDefaultServiceOrder(churchId: string) {
   }));
 }
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return new Date(value);
+  }
+
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function normalizeLegacySundayDateKey(value: string) {
+  const date = parseDateKey(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  // Older builds stored local Sundays via UTC serialization, which shifted them back to Saturday in Europe/Berlin.
+  if (date.getDay() === 6) {
+    const shiftedDate = new Date(date);
+    shiftedDate.setDate(shiftedDate.getDate() + 1);
+    return formatDateKey(shiftedDate);
+  }
+
+  return formatDateKey(date);
+}
+
+function countArchivedAssignments(plan: ArchivedServicePlan) {
+  return plan.activities.reduce((activityTotal, activity) => activityTotal + activity.roles.reduce(
+    (roleTotal, role) => roleTotal + role.assignments.length,
+    0,
+  ), 0);
+}
+
+function getArchiveAssignmentPriority(responseStatus: VolunteerAssignment['responseStatus']) {
+  switch (responseStatus) {
+    case 'accepted':
+      return 3;
+    case 'pending':
+      return 2;
+    case 'declined':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function collapseArchiveAssignments(
+  assignments: Array<{
+    assignedTo: string;
+    assignedUserId?: string;
+    responseStatus: VolunteerAssignment['responseStatus'];
+  }>,
+) {
+  if (assignments.length <= 1) {
+    return assignments;
+  }
+
+  const preferredAssignment = assignments.reduce((best, current) => {
+    if (!best) {
+      return current;
+    }
+
+    const currentPriority = getArchiveAssignmentPriority(current.responseStatus);
+    const bestPriority = getArchiveAssignmentPriority(best.responseStatus);
+    return currentPriority >= bestPriority ? current : best;
+  }, assignments[0]);
+
+  return preferredAssignment ? [preferredAssignment] : [];
+}
+
+function normalizeArchivedPlan(plan: ArchivedServicePlan): ArchivedServicePlan {
+  return {
+    ...plan,
+    serviceDate: normalizeLegacySundayDateKey(plan.serviceDate),
+    activities: plan.activities.map((activity) => ({
+      ...activity,
+      roles: activity.roles.map((role) => ({
+        ...role,
+        assignments: collapseArchiveAssignments(role.assignments),
+      })),
+    })),
+  };
+}
+
 function formatServiceDate(value: string) {
-  const date = new Date(value);
+  const date = parseDateKey(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -261,7 +352,7 @@ function getUpcomingSundayDates(count: number) {
 
   while (upcoming.length < count) {
     if (cursor.getDay() === 0) {
-      upcoming.push(cursor.toISOString().slice(0, 10));
+      upcoming.push(formatDateKey(cursor));
     }
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -278,7 +369,7 @@ function getPastSundayDates(limit: number) {
 
   while (past.length < limit) {
     if (cursor.getDay() === 0) {
-      past.push(cursor.toISOString().slice(0, 10));
+      past.push(formatDateKey(cursor));
     }
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -350,7 +441,21 @@ function loadArchivedPlans(churchId: string) {
       return [];
     }
     const parsedValue = JSON.parse(rawValue) as ArchivedServicePlan[];
-    return Array.isArray(parsedValue) ? parsedValue : [];
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    const normalizedPlans = new Map<string, ArchivedServicePlan>();
+    parsedValue.forEach((plan) => {
+      const normalizedPlan = normalizeArchivedPlan(plan);
+      const normalizedDate = normalizedPlan.serviceDate;
+      const existingPlan = normalizedPlans.get(normalizedDate);
+      if (!existingPlan || countArchivedAssignments(normalizedPlan) >= countArchivedAssignments(existingPlan)) {
+        normalizedPlans.set(normalizedDate, normalizedPlan);
+      }
+    });
+
+    return Array.from(normalizedPlans.values());
   } catch {
     return [];
   }
@@ -460,11 +565,13 @@ function buildArchivePlan(serviceDate: string, serviceOrder: ServiceActivity[], 
   const activities = serviceOrder.map((activity) => {
     const roles = buildRequirementsForActivities([activity], roleConfigs).map((requirement) => ({
       roleName: requirement.roleName,
-      assignments: getAssignmentsForRequirement(assignments, serviceDate, requirement).map((assignment) => ({
-        assignedTo: assignment.assignedTo,
-        assignedUserId: assignment.assignedUserId,
-        responseStatus: assignment.responseStatus,
-      })),
+      assignments: collapseArchiveAssignments(
+        getAssignmentsForRequirement(assignments, serviceDate, requirement).map((assignment) => ({
+          assignedTo: assignment.assignedTo,
+          assignedUserId: assignment.assignedUserId,
+          responseStatus: assignment.responseStatus,
+        })),
+      ),
     }));
 
     return { activityName: activity.activityName, teamName: activity.teamName, roles };
@@ -473,6 +580,137 @@ function buildArchivePlan(serviceDate: string, serviceOrder: ServiceActivity[], 
   return activities.some((activity) => activity.roles.some((role) => role.assignments.length > 0))
     ? { serviceDate, activities }
     : null;
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildArchiveExportRows(churchLabel: string, plans: ArchivedServicePlan[]) {
+  const rows: Array<[string, string, string, string, string, string]> = [];
+
+  plans.forEach((plan) => {
+    plan.activities.forEach((activity) => {
+      activity.roles.forEach((role) => {
+        role.assignments
+          .filter((assignment) => assignment.responseStatus !== 'declined')
+          .forEach((assignment) => {
+            rows.push([
+              churchLabel,
+              formatServiceDate(plan.serviceDate),
+              plan.serviceDate,
+              role.roleName,
+              assignment.assignedTo,
+              assignment.responseStatus,
+            ]);
+          });
+      });
+    });
+  });
+
+  if (rows.length === 0) {
+    rows.push([
+      churchLabel,
+      'No archived Sunday available',
+      '',
+      '',
+      'No accepted or pending archived assignments were available to export.',
+      '',
+    ]);
+  }
+
+  return rows;
+}
+
+function formatArchiveExportWorkbookXml(churchLabel: string, plans: ArchivedServicePlan[]) {
+  const headers = ['Church', 'Sunday', 'Date', 'Role', 'Person Assigned', 'Status'];
+  const rows = buildArchiveExportRows(churchLabel, plans);
+
+  const headerRowXml = headers
+    .map((header) => `<Cell ss:StyleID="HeaderCell"><Data ss:Type="String">${escapeXml(header)}</Data></Cell>`)
+    .join('');
+
+  const bodyRowsXml = rows
+    .map((row, rowIndex) => {
+      const styleId = rowIndex % 2 === 0 ? 'BodyCell' : 'BodyCellAlt';
+      return `<Row>${row
+        .map((value) => `<Cell ss:StyleID="${styleId}"><Data ss:Type="String">${escapeXml(value)}</Data></Cell>`)
+        .join('')}</Row>`;
+    })
+    .join('');
+
+  return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="TitleCell">
+   <Alignment ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="2"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="2"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2"/>
+   </Borders>
+   <Font ss:Bold="1" ss:Size="14" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#173754" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="HeaderCell">
+   <Alignment ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+   <Font ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#2B5B84" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="BodyCell">
+   <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+   <Interior ss:Color="#FFFDF8" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="BodyCellAlt">
+   <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+   <Interior ss:Color="#F4ECDE" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Archive Export">
+  <Table>
+   <Column ss:Width="140"/>
+   <Column ss:Width="130"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="160"/>
+   <Column ss:Width="170"/>
+   <Column ss:Width="95"/>
+   <Row ss:Height="24">
+    <Cell ss:MergeAcross="5" ss:StyleID="TitleCell"><Data ss:Type="String">${escapeXml(`${churchLabel} Service Plan Archive`)}</Data></Cell>
+   </Row>
+   <Row>${headerRowXml}</Row>
+   ${bodyRowsXml}
+  </Table>
+ </Worksheet>
+</Workbook>`;
 }
 
 function formatDateTimeRange(startAt: string, endAt: string) {
@@ -529,7 +767,7 @@ function App() {
   const [memberEditDrafts, setMemberEditDrafts] = useState<Record<string, { roleKey: RoleKey; teamNames: string[] }>>({});
   const [newTeamName, setNewTeamName] = useState('');
   const [newRoleForm, setNewRoleForm] = useState<{ teamName: string; roleName: string }>({ teamName: defaultTeams[1], roleName: '' });
-  const [expandedTeamName, setExpandedTeamName] = useState<string>(defaultTeams[1]);
+  const [expandedTeamName, setExpandedTeamName] = useState<string>('');
   const [selectedPlanningSunday, setSelectedPlanningSunday] = useState(getUpcomingSundayDates(2)[0] ?? '');
   const [planningForm, setPlanningForm] = useState({
     serviceDate: getUpcomingSundayDates(2)[0] ?? '',
@@ -544,6 +782,9 @@ function App() {
   const [isEditingServiceOrder, setIsEditingServiceOrder] = useState(false);
   const [archivedPlans, setArchivedPlans] = useState<ArchivedServicePlan[]>([]);
   const [selectedArchiveSunday, setSelectedArchiveSunday] = useState('');
+  const [loadedArchivePlan, setLoadedArchivePlan] = useState<ArchivedServicePlan | null>(null);
+  const [expandedArchiveActivityKeys, setExpandedArchiveActivityKeys] = useState<Record<string, boolean>>({});
+  const archiveDetailRef = useRef<HTMLDivElement | null>(null);
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '', isPublic: false });
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -567,7 +808,10 @@ function App() {
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
 
   const selectedChurch = churches.find((church) => church.id === selectedChurchId) ?? churches[0] ?? null;
-  const selectedChurchTeams = selectedChurch ? mergeTeams(defaultTeams as unknown as string[], selectedChurch.teams) : [...defaultTeams];
+  const selectedChurchTeams = useMemo(
+    () => selectedChurch ? mergeTeams(defaultTeams as unknown as string[], selectedChurch.teams) : [...defaultTeams],
+    [selectedChurch],
+  );
   const selectedChurchRoleConfigs = selectedChurch ? roleConfigsByChurch[selectedChurch.id] ?? getDefaultRoleConfigs(selectedChurch.id) : [];
   const orderedSelectedChurchTeams = useMemo(
     () => orderTeamsByRoleCount(selectedChurchTeams, selectedChurchRoleConfigs),
@@ -616,6 +860,7 @@ function App() {
   }, [planningForm.allowOtherMembers, scopedMembers, selectedPlanningRequirements]);
   const canManagePlanningStructure = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
   const canPlanAllTeams = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canExportArchive = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
 
   useEffect(() => {
     return onAdminAuthChanged((session) => {
@@ -705,12 +950,14 @@ function App() {
     }));
     const storedArchivedPlans = loadArchivedPlans(selectedChurch.id).sort((left, right) => right.serviceDate.localeCompare(left.serviceDate));
     setArchivedPlans(storedArchivedPlans);
-    setSelectedArchiveSunday(storedArchivedPlans[0]?.serviceDate ?? '');
+    setSelectedArchiveSunday('');
+    setLoadedArchivePlan(null);
+    setExpandedArchiveActivityKeys({});
     setEventForm((current) => ({
       ...current,
       location: selectedChurch.address,
     }));
-  }, [selectedChurch, selectedChurchTeams]);
+  }, [selectedChurch]);
 
   useEffect(() => {
     if (!selectedChurch) {
@@ -772,7 +1019,8 @@ function App() {
     ].sort((left, right) => right.serviceDate.localeCompare(left.serviceDate));
 
     setArchivedPlans(mergedPlans);
-    setSelectedArchiveSunday((current) => current || mergedPlans[0]?.serviceDate || '');
+    setSelectedArchiveSunday((current) => mergedPlans.some((plan) => plan.serviceDate === current) ? current : '');
+    setLoadedArchivePlan((current) => current ? mergedPlans.find((plan) => plan.serviceDate === current.serviceDate) ?? null : null);
     saveArchivedPlans(selectedChurch.id, mergedPlans);
   }, [archivedPlanningSundays, assignments, roleConfigsByChurch, selectedChurch, serviceOrderByChurch]);
 
@@ -989,7 +1237,7 @@ function App() {
         ...current,
         [selectedChurch.id]: (current[selectedChurch.id] ?? []).filter((role) => role.teamName !== teamName),
       }));
-      setExpandedTeamName(defaultTeams[1]);
+      setExpandedTeamName('');
       setUpdateMessage(`Removed ${teamName}. Existing assignments stay in history.`);
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to remove the team.');
@@ -1354,17 +1602,59 @@ function App() {
   };
 
   const handleExportArchive = () => {
-    if (!selectedChurch || archivedPlans.length === 0 || typeof window === 'undefined') {
+    if (!selectedChurch || archivedPlans.length === 0 || typeof window === 'undefined' || !canExportArchive) {
       return;
     }
 
-    const blob = new Blob([JSON.stringify(archivedPlans, null, 2)], { type: 'application/json' });
+    const exportWorkbook = formatArchiveExportWorkbookXml(selectedChurch.displayCity, archivedPlans);
+    const blob = new Blob([exportWorkbook], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${selectedChurch.id}-service-plan-archives.json`;
+    anchor.download = `${selectedChurch.id}-service-plan-archive.xls`;
     anchor.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  const loadArchiveIntoViewer = (serviceDate: string, showMessage: boolean) => {
+    if (!serviceDate) {
+      if (showMessage) {
+        setUpdateMessage('Choose an archived Sunday before loading the archive view.');
+      }
+      return;
+    }
+
+    const planToLoad = archivedPlans.find((plan) => plan.serviceDate === serviceDate) ?? null;
+    if (!planToLoad) {
+      if (showMessage) {
+        setUpdateMessage('No saved archive was found for that Sunday.');
+      }
+      setLoadedArchivePlan(null);
+      setExpandedArchiveActivityKeys({});
+      return;
+    }
+
+    setLoadedArchivePlan(planToLoad);
+    setExpandedArchiveActivityKeys({});
+
+    if (showMessage) {
+      setUpdateMessage(`Loaded archive for ${formatServiceDate(serviceDate)}.`);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        archiveDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
+    }
+  };
+
+  const handleLoadArchive = () => {
+    if (!selectedArchiveSunday) {
+      setUpdateMessage('Choose an archived Sunday before loading the archive view.');
+      return;
+    }
+
+    loadArchiveIntoViewer(selectedArchiveSunday, true);
   };
 
   if (!adminSession) {
@@ -1466,42 +1756,47 @@ function App() {
             </div>
           </div>
         </header>
-        <section className="scope-studio">
-          <article className="scope-card scope-card-primary">
-            <p className="panel-kicker">Scope studio</p>
-            <h3>Choose the church once, then work everywhere with the same scope.</h3>
-            <p className="scope-card-copy">Approvals, members, planning, church updates, and prayer moderation all follow this church selection.</p>
-            <div className="scope-card-controls">
-              <label className="auth-label" htmlFor="scope-church">Church location</label>
-              <select id="scope-church" className="auth-input" value={selectedChurchId} onChange={(event) => setSelectedChurchId(event.target.value)}>
-                {scopeChurchChoices.map((church) => (
-                  <option key={church.id} value={church.id}>{church.displayCity}</option>
-                ))}
-              </select>
-            </div>
-          </article>
-          <article className="scope-card scope-card-stat">
-            <p className="panel-kicker">Pending approvals</p>
-            <h3>{scopedRequests.filter((request) => request.status === 'pending').length}</h3>
-            <p className="scope-card-copy">Requests waiting in the selected church queue.</p>
-          </article>
-          <article className="scope-card scope-card-stat">
-            <p className="panel-kicker">Members tracked</p>
-            <h3>{scopedMembers.length}</h3>
-            <p className="scope-card-copy">{selectedChurch?.displayCity ?? 'Selected church'} members currently visible to this admin account.</p>
-          </article>
-        </section>
+        {activeView !== 'overview' ? (
+          <section className="scope-studio">
+            <article className="scope-card scope-card-primary">
+              <p className="panel-kicker">Scope studio</p>
+              <h3>Choose the church once, then work everywhere in that scope.</h3>
+              <p className="scope-card-copy">Approvals, members, planning, updates, and prayers follow this one selection.</p>
+              <div className="scope-card-controls">
+                <label className="auth-label" htmlFor="scope-church">Church location</label>
+                <select id="scope-church" className="auth-input" value={selectedChurchId} onChange={(event) => setSelectedChurchId(event.target.value)}>
+                  {scopeChurchChoices.map((church) => (
+                    <option key={church.id} value={church.id}>{church.displayCity}</option>
+                  ))}
+                </select>
+              </div>
+            </article>
+          </section>
+        ) : null}
 
         {activeView === 'overview' ? (
           <section className="dashboard-grid overview-grid">
-            <article className="hero-card">
+            <article className="scope-card scope-card-primary overview-scope-card">
+              <p className="panel-kicker">Scope studio</p>
+              <h3>Choose the church once.</h3>
+              <p className="scope-card-copy">Everything below updates to this location.</p>
+              <div className="scope-card-controls">
+                <label className="auth-label" htmlFor="overview-scope-church">Church location</label>
+                <select id="overview-scope-church" className="auth-input" value={selectedChurchId} onChange={(event) => setSelectedChurchId(event.target.value)}>
+                  {scopeChurchChoices.map((church) => (
+                    <option key={church.id} value={church.id}>{church.displayCity}</option>
+                  ))}
+                </select>
+              </div>
+            </article>
+            <article className="hero-card overview-hero-card">
               <p className="panel-kicker">{selectedChurch?.displayCity ?? 'Church'} overview</p>
-              <h3>Keep onboarding, Sunday planning, and church updates aligned from one professional workspace.</h3>
-              <p>Use the shared scope bar above to switch location once. The dashboard then updates approvals, prayer moderation, members, planning, and communication together.</p>
+              <h3>Keep onboarding, Sunday planning, and updates in one clear view.</h3>
+              <p>Track the key numbers, next-Sunday readiness, and church communication from one shared dashboard.</p>
               <div className="hero-actions">
-                <span className="pill strong">Shared church scope</span>
-                <span className="pill">Sunday-ready planning</span>
-                <span className="pill">Live member coordination</span>
+                <span className="pill strong">Shared scope</span>
+                <span className="pill">Sunday planning</span>
+                <span className="pill">Church updates</span>
               </div>
             </article>
             <article className="metric-card">
@@ -1815,7 +2110,7 @@ function App() {
                   <p className="panel-kicker">Sunday service order</p>
                   <h3>Plan the next two Sundays</h3>
                 </div>
-                {canManagePlanningStructure ? <button type="button" className={`action-button publish planning-order-toggle ${isEditingServiceOrder ? 'active' : ''}`} onClick={() => setIsEditingServiceOrder((current) => !current)}>Change service order</button> : null}
+                {canManagePlanningStructure ? <button type="button" className={`action-button publish planning-order-toggle ${isEditingServiceOrder ? 'active' : ''}`} onClick={() => setIsEditingServiceOrder((current) => !current)}><span>Change service<br />order</span></button> : null}
               </div>
               <div className="planning-sunday-columns">
                 {upcomingPlanningSundays.map((serviceDate) => (
@@ -1823,7 +2118,7 @@ function App() {
                     <div className="planning-sunday-header">
                       <div>
                         <strong>{formatServiceDate(serviceDate)}</strong>
-                        <p>{serviceDate === selectedPlanningSunday ? 'Active planning Sunday' : 'Upcoming service'}</p>
+                        <p>{serviceDate === selectedPlanningSunday ? 'Active Sunday' : 'Upcoming Sunday'}</p>
                       </div>
                       <button type="button" className="member-edit-button" onClick={() => setSelectedPlanningSunday(serviceDate)}>Select</button>
                     </div>
@@ -1894,39 +2189,48 @@ function App() {
 
             <article className="composer-card">
               <p className="panel-kicker">Activity planner</p>
-              <h3>Plan the next service role</h3>
+              <h3>Plan Sunday roles</h3>
               <div className="planning-form-grid planning-activity-picker">
-                <select className="auth-input" value={planningForm.serviceDate} onChange={(event) => setPlanningForm((current) => ({ ...current, serviceDate: event.target.value }))}>
-                  {upcomingPlanningSundays.map((serviceDate) => <option key={serviceDate} value={serviceDate}>{formatServiceDate(serviceDate)}</option>)}
-                </select>
-                <select className="auth-input" value={planningForm.activityKey} onChange={(event) => setPlanningForm((current) => ({ ...current, activityKey: event.target.value }))}>
-                  <option value="">Choose service activity</option>
-                  {planningActivityOptions.map((activity) => <option key={activity.key} value={activity.key}>{activity.label}</option>)}
-                </select>
-                <button
-                  type="button"
-                  className="action-button publish"
-                  onClick={() => {
-                    const activity = selectedPlanningActivity;
-                    if (!activity || !planningForm.serviceDate) {
-                      setUpdateMessage('Choose both the Sunday and activity before opening the planner.');
-                      return;
-                    }
-                    setOpenedPlanningKey(`${planningForm.serviceDate}:${activity.key}`);
-                    const activitiesToPlan = selectedChurchServiceOrder.filter((entry) => activity.activityIds.includes(entry.id));
-                    const requirements = buildRequirementsForActivities(activitiesToPlan, selectedChurchRoleConfigs);
-                    setPlanningDraftAssignments(
-                      requirements.reduce<Record<string, PlanningDraftItem[]>>((drafts, requirement) => {
-                        const existingAssignment = getAssignmentsForRequirement(scopedAssignments, planningForm.serviceDate, requirement)[0];
-                        drafts[requirement.id] = existingAssignment ? [{ assignedTo: existingAssignment.assignedTo, assignedUserId: existingAssignment.assignedUserId }] : [];
-                        return drafts;
-                      }, {}),
-                    );
-                    setUpdateMessage(`Planning ${activity.label} for ${formatServiceDate(planningForm.serviceDate)}.`);
-                  }}
-                >
-                  Plan
-                </button>
+                <div className="planning-activity-field">
+                  <label className="auth-label" htmlFor="planning-service-date">Sunday</label>
+                  <select id="planning-service-date" className="auth-input" value={planningForm.serviceDate} onChange={(event) => setPlanningForm((current) => ({ ...current, serviceDate: event.target.value }))}>
+                    {upcomingPlanningSundays.map((serviceDate) => <option key={serviceDate} value={serviceDate}>{formatServiceDate(serviceDate)}</option>)}
+                  </select>
+                </div>
+                <div className="planning-activity-field">
+                  <label className="auth-label" htmlFor="planning-activity-key">Activity</label>
+                  <select id="planning-activity-key" className="auth-input" value={planningForm.activityKey} onChange={(event) => setPlanningForm((current) => ({ ...current, activityKey: event.target.value }))}>
+                    <option value="">Choose Sunday activity</option>
+                    {planningActivityOptions.map((activity) => <option key={activity.key} value={activity.key}>{activity.label}</option>)}
+                  </select>
+                </div>
+                <div className="planning-activity-action">
+                  <span className="planning-activity-action-label">Open planner</span>
+                  <button
+                    type="button"
+                    className="action-button publish"
+                    onClick={() => {
+                      const activity = selectedPlanningActivity;
+                      if (!activity || !planningForm.serviceDate) {
+                        setUpdateMessage('Choose both the Sunday and activity before opening the planner.');
+                        return;
+                      }
+                      setOpenedPlanningKey(`${planningForm.serviceDate}:${activity.key}`);
+                      const activitiesToPlan = selectedChurchServiceOrder.filter((entry) => activity.activityIds.includes(entry.id));
+                      const requirements = buildRequirementsForActivities(activitiesToPlan, selectedChurchRoleConfigs);
+                      setPlanningDraftAssignments(
+                        requirements.reduce<Record<string, PlanningDraftItem[]>>((drafts, requirement) => {
+                          const existingAssignment = getAssignmentsForRequirement(scopedAssignments, planningForm.serviceDate, requirement)[0];
+                          drafts[requirement.id] = existingAssignment ? [{ assignedTo: existingAssignment.assignedTo, assignedUserId: existingAssignment.assignedUserId }] : [];
+                          return drafts;
+                        }, {}),
+                      );
+                      setUpdateMessage(`Planning ${activity.label} for ${formatServiceDate(planningForm.serviceDate)}.`);
+                    }}
+                  >
+                    Plan
+                  </button>
+                </div>
               </div>
               {selectedPlanningActivity && openedPlanningKey === `${planningForm.serviceDate}:${selectedPlanningActivity.key}` ? (
                 <div className="planning-activity-workbench">
@@ -2021,16 +2325,106 @@ function App() {
               <div className="planning-archive-toolbar">
                 <div className="filter-panel">
                   <label className="auth-label" htmlFor="archive-sunday">Select archived Sunday</label>
-                  <select id="archive-sunday" className="auth-input" value={selectedArchiveSunday} onChange={(event) => setSelectedArchiveSunday(event.target.value)} disabled={archivedPlans.length === 0}>
-                    {archivedPlans.length === 0 ? <option value="">No archived Sunday yet</option> : null}
+                  <select
+                    id="archive-sunday"
+                    className="auth-input"
+                    value={selectedArchiveSunday}
+                    onChange={(event) => {
+                      const nextSunday = event.target.value;
+                      setSelectedArchiveSunday(nextSunday);
+                      setLoadedArchivePlan((current) => current?.serviceDate === nextSunday ? current : null);
+                      setExpandedArchiveActivityKeys({});
+                    }}
+                    disabled={archivedPlans.length === 0}
+                  >
+                    <option value="">{archivedPlans.length === 0 ? 'No archived Sunday yet' : 'Choose archived Sunday'}</option>
                     {archivedPlans.map((plan) => <option key={plan.serviceDate} value={plan.serviceDate}>{formatServiceDate(plan.serviceDate)}</option>)}
                   </select>
                 </div>
                 <div className="chip-row">
                   <span className="mini-chip">Saved file entries: {archivedPlans.length}</span>
-                  <button type="button" className="action-button publish" onClick={() => handleExportArchive()} disabled={archivedPlans.length === 0}>Export archive file</button>
+                  <button type="button" className="action-button approve" onClick={() => handleLoadArchive()} disabled={!selectedArchiveSunday}>Load archive</button>
+                  {canExportArchive ? <button type="button" className="action-button publish" onClick={() => handleExportArchive()} disabled={archivedPlans.length === 0}>Export archive file</button> : null}
                 </div>
               </div>
+              {selectedArchiveSunday && (!loadedArchivePlan || loadedArchivePlan.serviceDate !== selectedArchiveSunday) ? (
+                <div className="notice-banner inline-banner">Archived Sunday selected. Press <strong>Load archive</strong> to open it.</div>
+              ) : null}
+              {loadedArchivePlan ? (
+                <div ref={archiveDetailRef} className="planning-archive-loaded">
+                  <div className="section-heading">
+                    <div>
+                      <p className="panel-kicker">Archive detail</p>
+                      <h3>Service order for {formatServiceDate(loadedArchivePlan.serviceDate)}</h3>
+                      <p className="detail-copy">Expand any activity below to review its saved assignments.</p>
+                    </div>
+                    <span className="archive-loaded-badge">Loaded archive</span>
+                  </div>
+                  <div className="planning-sunday-card">
+                    <div className="planning-sunday-header">
+                      <div>
+                        <strong>{formatServiceDate(loadedArchivePlan.serviceDate)}</strong>
+                        <p>Archived Sunday service order</p>
+                      </div>
+                      <span className="mini-chip">{loadedArchivePlan.activities.length} activities</span>
+                    </div>
+                    <div className="planning-activity-list">
+                      {loadedArchivePlan.activities.map((activity) => {
+                        const activityKey = `archive:${loadedArchivePlan.serviceDate}:${activity.activityName}`;
+                        const expanded = expandedArchiveActivityKeys[activityKey] === true;
+                        const assignedRoles = activity.roles.filter((role) => role.assignments.length > 0);
+                        return (
+                          <div key={activityKey} className={`planning-activity-tile ${expanded ? 'expanded' : ''}`}>
+                            <button type="button" className="planning-activity-toggle planning-archive-toggle" onClick={() => setExpandedArchiveActivityKeys((current) => ({ ...current, [activityKey]: !expanded }))}>
+                              <div className="planning-activity-heading">
+                                <strong>{activity.activityName}</strong>
+                                <div className="planning-activity-team-line">
+                                  <span className="planning-activity-team-icon"><TeamIcon teamName={activity.teamName === 'Service Flow' ? 'Member' : activity.teamName} /></span>
+                                  <p>{activity.teamName === 'Service Flow' ? 'Any church member' : activity.teamName}</p>
+                                </div>
+                              </div>
+                              <ChevronIcon className={`planning-activity-chevron ${expanded ? 'expanded' : ''}`} />
+                            </button>
+                            {expanded ? (
+                              <div className="planning-activity-body">
+                                {assignedRoles.map((role) => (
+                                  <article key={`${activity.activityName}:${role.roleName}`} className="planning-requirement-row">
+                                    <div className="planning-requirement-side">
+                                      <strong>{role.roleName}</strong>
+                                      <span className="mini-chip">{role.assignments.length} planned</span>
+                                    </div>
+                                    <div className="planning-requirement-teamline">
+                                      <span className="planning-requirement-teamicon"><TeamIcon teamName={activity.teamName === 'Service Flow' ? 'Member' : activity.teamName} /></span>
+                                      <p>{activity.teamName === 'Service Flow' ? 'Any church member' : activity.teamName}</p>
+                                    </div>
+                                    {role.assignments.length > 0 ? (
+                                      <div className="planning-assignee-list">
+                                        {role.assignments.map((assignment) => (
+                                          <div key={`${role.roleName}:${assignment.assignedTo}`} className="planning-assignee-card">
+                                            <div>
+                                              <strong>{assignment.assignedTo}</strong>
+                                              <p>{assignment.assignedUserId ? 'Assigned member' : 'Saved archive entry'}</p>
+                                            </div>
+                                            <span className={`response-tag ${assignment.responseStatus}`}>{assignment.responseStatus}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </article>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="planning-sunday-card">
+                  <div className="empty-card">Select an archived Sunday above and click <strong>Load archive</strong> to review the saved service plan.</div>
+                </div>
+              )}
             </article>
           </section>
         ) : null}
@@ -2191,19 +2585,16 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('worship')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="18" cy="18" r="6" fill="none" stroke="currentColor" strokeWidth="3.2" />
-        <circle cx="32" cy="12" r="6" fill="none" stroke="currentColor" strokeWidth="3.2" />
-        <circle cx="46" cy="18" r="6" fill="none" stroke="currentColor" strokeWidth="3.2" />
-        <path d="M8 44C11 32 14 26 18 26C22 26 25 32 28 44" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M22 36C25 24 28 18 32 18C36 18 39 24 42 36" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M36 44C39 32 42 26 46 26C50 26 53 32 56 44" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M26 30L29 15L33 30" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M37 33L43 12" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-        <circle cx="45" cy="8" r="2.8" fill="none" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M5 12C10 7.5 15 7.5 20 12" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M27 6C31 1.5 35 1.5 39 6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M44 12C49 7.5 54 7.5 59 12" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M10 50H54" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+        <circle cx="17" cy="21" r="4.8" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M9 45C11.5 33 14.2 27.5 17 27.5C19.8 27.5 22.6 33 25 45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="32" cy="15" r="5.4" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M22.5 46C25 31.5 28 25.5 32 25.5C36 25.5 39 31.5 41.5 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="47" cy="21" r="4.8" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M39 45C41.4 33 44.2 27.5 47 27.5C49.8 27.5 52.6 33 55 45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M25 50H39" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M32 50V59" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M48 10C53 6 58 10 58 15" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+        <path d="M53 6C60 1 64 8 64 14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
       </svg>
     );
   }
@@ -2211,12 +2602,13 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('speaker')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="28" cy="14" r="6" fill="none" stroke="currentColor" strokeWidth="3.2" />
-        <path d="M18 44H40L34 26H22L18 44Z" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinejoin="round" />
-        <path d="M28 20V30" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-        <circle cx="28" cy="18" r="2.3" fill="currentColor" stroke="none" />
-        <path d="M42 14C48 12 52 15 53 20" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-        <path d="M48 8C56 6 61 12 61 20" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+        <circle cx="28" cy="13" r="5.6" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M20 28C22.5 20.5 25.2 17.5 28 17.5C30.8 17.5 33.5 20.5 36 28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M16 47H40" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M21 47L24.5 30H31.5L35 47" fill="none" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+        <path d="M42 18C48 15 53 19 53 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+        <path d="M48 10C57 7 63 14 63 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+        <path d="M11 18C6 15 2 19 2 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
       </svg>
     );
   }
@@ -2238,14 +2630,15 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('sunday school')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="14" cy="24" r="5" fill="none" stroke="currentColor" strokeWidth="3" />
-        <circle cx="28" cy="20" r="5" fill="none" stroke="currentColor" strokeWidth="3" />
-        <circle cx="42" cy="24" r="5" fill="none" stroke="currentColor" strokeWidth="3" />
-        <circle cx="52" cy="16" r="5.5" fill="none" stroke="currentColor" strokeWidth="3.2" />
-        <path d="M8 44C10.5 34 12 30 14 30C16 30 20 34 23 44" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M22 40C24.5 30 26 26 28 26C30 26 34 30 37 40" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M36 44C38.5 34 40 30 42 30C44 30 48 34 51 44" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M46 39C48.5 26 50 22 52 22C54 22 58 27 61 39" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+        <circle cx="18" cy="21" r="5.2" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M10 46C12.5 35 15 29 18 29C21 29 23.8 35 26 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="34" cy="14" r="6" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M24 44C26.5 31.5 30 24 34 24C38 24 41.5 31.5 44 44" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="50" cy="21" r="5.2" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M42 46C44.2 35 47 29 50 29C53 29 55.5 35 58 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M6 52H58" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M24 48L30 42L36 48" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M40 48L46 42L52 48" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
@@ -2253,15 +2646,15 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('tech')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <rect x="10" y="12" width="24" height="16" rx="3.2" fill="none" stroke="currentColor" strokeWidth="3.2" />
-        <path d="M17 34H27" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M22 28V34" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <circle cx="46" cy="22" r="4.2" fill="none" stroke="currentColor" strokeWidth="2.9" />
-        <circle cx="57" cy="22" r="4.2" fill="none" stroke="currentColor" strokeWidth="2.9" />
-        <path d="M46 34V47" fill="none" stroke="currentColor" strokeWidth="2.9" strokeLinecap="round" />
-        <path d="M57 34V47" fill="none" stroke="currentColor" strokeWidth="2.9" strokeLinecap="round" />
-        <path d="M42 39H50" fill="none" stroke="currentColor" strokeWidth="2.9" strokeLinecap="round" />
-        <path d="M53 30H61" fill="none" stroke="currentColor" strokeWidth="2.9" strokeLinecap="round" />
+        <rect x="9" y="16" width="30" height="20" rx="3.8" fill="none" stroke="currentColor" strokeWidth="3" />
+        <path d="M22 38V43" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M15 47H29" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M48 14V42" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="48" cy="26" r="5.4" fill="none" stroke="currentColor" strokeWidth="2.6" />
+        <path d="M58 10V48" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="58" cy="36" r="5.4" fill="none" stroke="currentColor" strokeWidth="2.6" />
+        <path d="M14 26H32" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+        <path d="M14 31H26" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
       </svg>
     );
   }

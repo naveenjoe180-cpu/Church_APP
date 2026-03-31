@@ -1,0 +1,67 @@
+<svg width="1160" height="760" viewBox="0 0 1160 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1160" height="760" rx="28" fill="#EEF4F8"/>
+  <rect x="24" y="24" width="1112" height="712" rx="24" fill="#F9FCFF" stroke="#BFD5E3"/>
+  <text x="56" y="86" fill="#133653" font-family="Georgia, serif" font-size="38" font-weight="700">Team Icons Sample B</text>
+  <text x="56" y="118" fill="#59778D" font-family="Arial, sans-serif" font-size="20">Clean modern line icons with cool accents</text>
+
+  <defs>
+    <g id="card">
+      <rect width="242" height="248" rx="24" fill="#FFFFFF" stroke="#C9DCE8"/>
+    </g>
+    <g id="note">
+      <path d="M0 -26V10C0 20 -8 28 -18 28C-26 28 -32 23 -32 16C-32 8 -25 2 -15 2C-9 2 -4 4 0 8V-22L34 -30V4C34 14 26 22 16 22C8 22 2 17 2 10C2 2 9 -4 19 -4C24 -4 29 -2 34 2" stroke="#133653" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="kids">
+      <circle cx="-24" cy="-14" r="8" stroke="#133653" stroke-width="6"/>
+      <circle cx="0" cy="-26" r="10" stroke="#133653" stroke-width="6"/>
+      <circle cx="28" cy="-14" r="8" stroke="#133653" stroke-width="6"/>
+      <path d="M-36 22C-32 6 -28 0 -24 0C-20 0 -16 6 -12 22" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-14 20C-9 0 -4 -10 0 -10C6 -10 12 0 16 20" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+      <path d="M18 22C22 6 24 0 28 0C32 0 36 6 40 22" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <g id="mic">
+      <rect x="-8" y="-38" width="16" height="30" rx="8" stroke="#133653" stroke-width="6"/>
+      <path d="M-18 -12C-18 0 -10 8 0 8C10 8 18 0 18 -12" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+      <path d="M0 8V34" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-16 36H16" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+      <path d="M30 -20C42 -26 54 -16 54 -2" stroke="#48A4C4" stroke-width="5" stroke-linecap="round"/>
+      <path d="M38 -34C56 -42 72 -26 72 -6" stroke="#48A4C4" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <g id="screen">
+      <rect x="-48" y="-34" width="82" height="54" rx="10" stroke="#133653" stroke-width="6"/>
+      <path d="M-10 26V40" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-28 42H8" stroke="#133653" stroke-width="6" stroke-linecap="round"/>
+      <path d="M48 -30V20" stroke="#48A4C4" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="48" cy="-8" r="8" fill="#F9FCFF" stroke="#48A4C4" stroke-width="5"/>
+      <path d="M72 -20V16" stroke="#3B7F62" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="72" cy="4" r="8" fill="#F9FCFF" stroke="#3B7F62" stroke-width="5"/>
+    </g>
+  </defs>
+
+  <g transform="translate(56 164)">
+    <g transform="translate(0 0)">
+      <use href="#card"/>
+      <g transform="translate(122 104)"><use href="#note"/></g>
+      <text x="24" y="194" fill="#133653" font-family="Arial, sans-serif" font-size="24" font-weight="700">Worship Team</text>
+      <text x="24" y="220" fill="#59778D" font-family="Arial, sans-serif" font-size="15">Music note + rhythm line</text>
+    </g>
+    <g transform="translate(264 0)">
+      <use href="#card"/>
+      <g transform="translate(122 104)"><use href="#kids"/></g>
+      <text x="24" y="194" fill="#133653" font-family="Arial, sans-serif" font-size="24" font-weight="700">Sunday School Team</text>
+      <text x="24" y="220" fill="#59778D" font-family="Arial, sans-serif" font-size="15">Teacher and children</text>
+    </g>
+    <g transform="translate(528 0)">
+      <use href="#card"/>
+      <g transform="translate(122 104)"><use href="#mic"/></g>
+      <text x="24" y="194" fill="#133653" font-family="Arial, sans-serif" font-size="24" font-weight="700">Speakers Team</text>
+      <text x="24" y="220" fill="#59778D" font-family="Arial, sans-serif" font-size="15">Mic + voice lines</text>
+    </g>
+    <g transform="translate(792 0)">
+      <use href="#card"/>
+      <g transform="translate(122 104)"><use href="#screen"/></g>
+      <text x="24" y="194" fill="#133653" font-family="Arial, sans-serif" font-size="24" font-weight="700">Tech Team</text>
+      <text x="24" y="220" fill="#59778D" font-family="Arial, sans-serif" font-size="15">Screen + audio sliders</text>
+    </g>
+  </g>
+</svg>

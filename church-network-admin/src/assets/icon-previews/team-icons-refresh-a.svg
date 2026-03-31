@@ -1,0 +1,82 @@
+<svg width="1160" height="760" viewBox="0 0 1160 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1160" height="760" rx="28" fill="#F6F0E2"/>
+  <rect x="24" y="24" width="1112" height="712" rx="24" fill="#FFF9EF" stroke="#D8C39D"/>
+  <text x="56" y="86" fill="#173754" font-family="Georgia, serif" font-size="38" font-weight="700">Team Icons Sample A</text>
+  <text x="56" y="118" fill="#7C6A54" font-family="Arial, sans-serif" font-size="20">Heritage outline icons with warm accents</text>
+
+  <defs>
+    <g id="card">
+      <rect width="242" height="248" rx="24" fill="#FFFCF6" stroke="#D8C39D"/>
+    </g>
+    <g id="worship">
+      <circle cx="-34" cy="-18" r="8" stroke="#173754" stroke-width="6"/>
+      <path d="M-48 18C-44 0 -39 -8 -34 -8C-29 -8 -24 0 -20 18" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="0" cy="-26" r="9" stroke="#173754" stroke-width="6"/>
+      <path d="M-16 20C-12 -1 -6 -10 0 -10C6 -10 12 -1 16 20" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="34" cy="-18" r="8" stroke="#173754" stroke-width="6"/>
+      <path d="M20 18C24 0 29 -8 34 -8C39 -8 44 0 48 18" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <path d="M54 -34C64 -42 74 -34 74 -24" stroke="#C68642" stroke-width="5" stroke-linecap="round"/>
+      <path d="M64 -48C78 -58 94 -46 94 -28" stroke="#C68642" stroke-width="5" stroke-linecap="round"/>
+      <path d="M-12 30H12" stroke="#2D6A4F" stroke-width="6" stroke-linecap="round"/>
+      <path d="M0 30V54" stroke="#2D6A4F" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <g id="school">
+      <circle cx="-26" cy="-18" r="9" stroke="#173754" stroke-width="6"/>
+      <path d="M-40 20C-35 2 -31 -6 -26 -6C-21 -6 -16 2 -12 20" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="10" cy="-28" r="10" stroke="#173754" stroke-width="6"/>
+      <path d="M-6 18C-1 -2 4 -10 10 -10C16 -10 22 -2 26 18" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="42" cy="-16" r="8" stroke="#173754" stroke-width="6"/>
+      <path d="M30 18C34 2 37 -4 42 -4C47 -4 51 2 54 18" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-54 42H60" stroke="#C68642" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-18 34L-6 22L6 34" stroke="#C68642" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M30 34L42 22L54 34" stroke="#C68642" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="speakers">
+      <circle cx="0" cy="-34" r="10" stroke="#173754" stroke-width="6"/>
+      <path d="M-14 -12C-10 -22 -5 -26 0 -26C5 -26 10 -22 14 -12" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-26 30H26" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-16 30L-8 2H8L16 30" stroke="#173754" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M30 -12C42 -16 50 -8 50 2" stroke="#A3523B" stroke-width="5" stroke-linecap="round"/>
+      <path d="M38 -28C56 -34 70 -20 70 0" stroke="#A3523B" stroke-width="5" stroke-linecap="round"/>
+      <path d="M-44 -12C-56 -16 -64 -8 -64 2" stroke="#2D6A4F" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <g id="tech">
+      <rect x="-52" y="-40" width="84" height="58" rx="10" stroke="#173754" stroke-width="6"/>
+      <path d="M-14 24H-4" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-30 40H14" stroke="#173754" stroke-width="6" stroke-linecap="round"/>
+      <path d="M42 -26V12" stroke="#C68642" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="42" cy="-8" r="9" fill="#FFF9EF" stroke="#C68642" stroke-width="5"/>
+      <path d="M66 -30V18" stroke="#2D6A4F" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="66" cy="2" r="9" fill="#FFF9EF" stroke="#2D6A4F" stroke-width="5"/>
+      <path d="M-34 -12H16" stroke="#173754" stroke-width="4" stroke-linecap="round"/>
+      <path d="M-34 2H6" stroke="#173754" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <g transform="translate(56 164)">
+    <g transform="translate(0 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)"><use href="#worship"/></g>
+      <text x="24" y="194" fill="#173754" font-family="Arial, sans-serif" font-size="24" font-weight="700">Worship Team</text>
+      <text x="24" y="220" fill="#7C6A54" font-family="Arial, sans-serif" font-size="15">Choir + musical lead</text>
+    </g>
+    <g transform="translate(264 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)"><use href="#school"/></g>
+      <text x="24" y="194" fill="#173754" font-family="Arial, sans-serif" font-size="24" font-weight="700">Sunday School Team</text>
+      <text x="24" y="220" fill="#7C6A54" font-family="Arial, sans-serif" font-size="15">Teacher with children</text>
+    </g>
+    <g transform="translate(528 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)"><use href="#speakers"/></g>
+      <text x="24" y="194" fill="#173754" font-family="Arial, sans-serif" font-size="24" font-weight="700">Speakers Team</text>
+      <text x="24" y="220" fill="#7C6A54" font-family="Arial, sans-serif" font-size="15">Pulpit + voice lines</text>
+    </g>
+    <g transform="translate(792 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)"><use href="#tech"/></g>
+      <text x="24" y="194" fill="#173754" font-family="Arial, sans-serif" font-size="24" font-weight="700">Tech Team</text>
+      <text x="24" y="220" fill="#7C6A54" font-family="Arial, sans-serif" font-size="15">Projection + sound controls</text>
+    </g>
+  </g>
+</svg>

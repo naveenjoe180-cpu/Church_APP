@@ -80,6 +80,25 @@ const initialEmailAuthForm: EmailAuthForm = {
 const officialLogo = require('../../assets/official-church-logo.jpg');
 
 const stageOrder: AppStage[] = ['guest', 'signin', 'profile', 'pending', 'approved'];
+const approvedMemberModules = ['Sunday plan', 'Assignments', 'Announcements', 'Events'];
+const aboutUsSummary = [
+  {
+    title: 'A church built on love for God and people',
+    body: 'Bethel International Pentecostal Church in Germany is under the pastoral care of Pastor Shaju Samuel and describes love for God and love for people as a central foundation of its life and ministry.',
+  },
+  {
+    title: 'A multicultural church family',
+    body: 'What began in 2011 with a small number of Malayalee families has grown into a church community with multiple nationalities, languages, and ethnic backgrounds worshipping together.',
+  },
+  {
+    title: 'Worship, prayer, and ministry for every age',
+    body: 'The church highlights worship in several languages and points to ministries such as youth gatherings, fasting prayer, cottage meetings, Sunday School, outreach, and early morning prayer.',
+  },
+  {
+    title: 'Growing across Europe',
+    body: 'The ministry now serves churches in several German cities and also describes branch churches in Sweden and Lithuania, with an invitation for visitors to experience both the presence of God and a family atmosphere.',
+  },
+];
 
 export function ChurchNetworkPrototypeApp() {
   const [stage, setStage] = useState<AppStage>('guest');
@@ -517,6 +536,8 @@ function GuestScreen({
   onRequestAccess: () => void;
   onOpenUrl: (url: string) => void;
 }) {
+  const [showAboutUs, setShowAboutUs] = useState(false);
+
   return (
     <>
       <SectionHeader title="Guest mode" body="A welcoming front door for service times, locations, media, and first contact with the church network." />
@@ -550,10 +571,28 @@ function GuestScreen({
       <View style={styles.linkPanel}>
         <Text style={styles.linkPanelTitle}>Public church links</Text>
         <View style={styles.linkRow}>
+          <LinkButton label="About Us" onPress={() => setShowAboutUs((current) => !current)} active={showAboutUs} />
           <LinkButton label="Weekly Meeting" url="https://meet.google.com" onOpenUrl={onOpenUrl} />
           <LinkButton label="YouTube Channel" url="https://www.youtube.com/@bipcgermany" onOpenUrl={onOpenUrl} />
           <LinkButton label="Instagram" url="https://www.instagram.com/bethel_international_church/" onOpenUrl={onOpenUrl} />
+          <LinkButton label="Contact" url="https://wa.me/491725818673" onOpenUrl={onOpenUrl} />
         </View>
+        {showAboutUs ? (
+          <View style={styles.aboutPanel}>
+            <Text style={styles.aboutPanelTitle}>About Bethel International Pentecostal Church</Text>
+            <Text style={styles.aboutPanelBody}>
+              Bethel International Pentecostal Church describes itself as a loving church family where people from different backgrounds worship together, grow in prayer and ministry, and experience the power of Pentecost.
+            </Text>
+            <View style={styles.storyBand}>
+              {aboutUsSummary.map((item) => (
+                <StoryCard key={item.title} title={item.title} body={item.body} />
+              ))}
+            </View>
+            <View style={styles.actionRowWide}>
+              <SecondaryButton label="Read Full Page" onPress={() => onOpenUrl('https://bethel-pentecostal.org/about-us/')} />
+            </View>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.actionRow}>
@@ -802,15 +841,30 @@ function ApprovedPreviewScreen({
   onRespondToAssignment: (assignment: MemberAssignment, responseStatus: 'accepted' | 'declined') => void;
   onReset: () => void;
 }) {
+  const sortedAssignments = useMemo(
+    () =>
+      [...assignments].sort((left, right) => {
+        const leftDate = parseCalendarDate(left.serviceDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const rightDate = parseCalendarDate(right.serviceDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return leftDate - rightDate;
+      }),
+    [assignments],
+  );
   const nextEvent = events[0];
-  const pendingAssignments = assignments.filter((assignment) => assignment.responseStatus === 'pending').length;
+  const pendingAssignments = sortedAssignments.filter((assignment) => assignment.responseStatus === 'pending').length;
+  const acceptedAssignments = sortedAssignments.filter((assignment) => assignment.responseStatus === 'accepted').length;
+  const nextAssignment = sortedAssignments[0];
+  const hasSundayPlan = Boolean(nextAssignment);
 
   return (
     <>
-      <SectionHeader title="Approved member preview" body="Once approved, the product shifts into communication, coordination, and church life." />
+      <SectionHeader title="Approved member space" body="Once approved, your church updates, Sunday assignments, and upcoming gatherings all stay together here." />
       <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Welcome, {form.displayName || 'Member'}</Text>
-        <Text style={styles.cardBody}>This is the post-approval preview for {church.name}. Members first enter their own church space, receive local church updates, and only see teams assigned by local admins or leaders.</Text>
+        <Text style={styles.panelTitle}>Welcome to {church.name}</Text>
+        <Text style={styles.cardBody}>
+          {form.displayName || 'Member'}, you are now inside the {church.displayCity} church space. This is where you receive church announcements,
+          see your next Sunday role, and respond when leaders assign you to serve.
+        </Text>
         <View style={styles.contentMetricRow}>
           <View style={styles.contentMetricCard}>
             <Text style={styles.contentMetricLabel}>Church Space</Text>
@@ -818,27 +872,27 @@ function ApprovedPreviewScreen({
             <Text style={styles.contentMetricHint}>{church.serviceTimes}</Text>
           </View>
           <View style={styles.contentMetricCard}>
-            <Text style={styles.contentMetricLabel}>Announcements</Text>
-            <Text style={styles.contentMetricValue}>{announcements.length}</Text>
-            <Text style={styles.contentMetricHint}>Recent communication in one place</Text>
+            <Text style={styles.contentMetricLabel}>Sunday Plan</Text>
+            <Text style={styles.contentMetricValue}>{hasSundayPlan ? formatAssignmentDate(nextAssignment.serviceDate) : 'Open'}</Text>
+            <Text style={styles.contentMetricHint}>{hasSundayPlan ? `${nextAssignment.roleName} | ${nextAssignment.teamName}` : 'Your next service role will appear here'}</Text>
           </View>
           <View style={styles.contentMetricCard}>
-            <Text style={styles.contentMetricLabel}>Next Event</Text>
-            <Text style={styles.contentMetricValue}>{nextEvent ? formatCompactDate(nextEvent.startAt) : 'Soon'}</Text>
-            <Text style={styles.contentMetricHint}>{nextEvent ? nextEvent.title : 'Upcoming meetings will appear here'}</Text>
+            <Text style={styles.contentMetricLabel}>Church Updates</Text>
+            <Text style={styles.contentMetricValue}>{announcements.length + events.length}</Text>
+            <Text style={styles.contentMetricHint}>{announcements.length} announcements and {events.length} upcoming events</Text>
           </View>
           <View style={styles.contentMetricCard}>
-            <Text style={styles.contentMetricLabel}>My Tasks</Text>
-            <Text style={styles.contentMetricValue}>{assignments.length}</Text>
-            <Text style={styles.contentMetricHint}>{pendingAssignments > 0 ? `${pendingAssignments} waiting for your response` : 'All current responses recorded'}</Text>
+            <Text style={styles.contentMetricLabel}>My Responses</Text>
+            <Text style={styles.contentMetricValue}>{pendingAssignments > 0 ? pendingAssignments.toString() : acceptedAssignments.toString()}</Text>
+            <Text style={styles.contentMetricHint}>{pendingAssignments > 0 ? 'Assignments waiting for your response' : `${acceptedAssignments} accepted so far`}</Text>
           </View>
         </View>
         <View style={styles.noticeBox}>
-          <Text style={styles.noticeText}>Only network super admins can see all churches and all members across the network.</Text>
+          <Text style={styles.noticeText}>Only the teams assigned by your church leaders will show up here. Other churches and network-wide admin areas stay hidden.</Text>
         </View>
       </View>
       <View style={styles.moduleWrap}>
-        {privateModules.map((item) => (
+        {approvedMemberModules.map((item) => (
           <View key={item} style={[styles.modulePill, styles.modulePillActive]}>
             <Text style={[styles.modulePillText, styles.modulePillTextActive]}>{item}</Text>
           </View>
@@ -846,15 +900,31 @@ function ApprovedPreviewScreen({
       </View>
       <View style={styles.grid}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>My team assignments</Text>
+          <Text style={styles.cardTitle}>My Sunday plan</Text>
           {assignmentNotice ? (
             <View style={styles.noticeBox}>
               <Text style={styles.noticeText}>{assignmentNotice}</Text>
             </View>
           ) : null}
+          <View style={styles.planHeroCard}>
+            <View style={styles.planHeroCopy}>
+              <Text style={styles.planHeroLabel}>Next Sunday assignment</Text>
+              <Text style={styles.planHeroTitle}>{nextAssignment ? nextAssignment.roleName : 'No role assigned yet'}</Text>
+              <Text style={styles.planHeroMeta}>
+                {nextAssignment
+                  ? `${formatAssignmentDate(nextAssignment.serviceDate)} | ${nextAssignment.teamName}`
+                  : `When ${church.displayCity} leaders plan the next Sunday, your role will appear here.`}
+              </Text>
+            </View>
+            <View style={[styles.assignmentStatusBadge, nextAssignment?.responseStatus === 'accepted' && styles.assignmentStatusAccepted, nextAssignment?.responseStatus === 'declined' && styles.assignmentStatusDeclined]}>
+              <Text style={[styles.assignmentStatusText, nextAssignment?.responseStatus !== 'pending' && styles.assignmentStatusTextDark]}>
+                {nextAssignment ? capitalize(nextAssignment.responseStatus) : 'Open'}
+              </Text>
+            </View>
+          </View>
           <View style={styles.contentList}>
-            {assignments.length > 0 ? (
-              assignments.map((assignment, index) => (
+            {sortedAssignments.length > 0 ? (
+              sortedAssignments.map((assignment, index) => (
                 <View key={assignment.id} style={[styles.contentItem, index === 0 && styles.contentItemFirst]}>
                   <View style={styles.assignmentTopRow}>
                     <View style={styles.assignmentCopy}>
@@ -891,12 +961,12 @@ function ApprovedPreviewScreen({
                 </View>
               ))
             ) : (
-              <Text style={styles.emptyState}>No team assignments have been sent to you yet. When a leader assigns you, the task will appear here with pending, accepted, or declined status.</Text>
+              <Text style={styles.emptyState}>No team assignments have been sent to you yet. When a leader assigns you to a Sunday role, it will appear here with pending, accepted, or declined status.</Text>
             )}
           </View>
         </View>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Latest announcements</Text>
+          <Text style={styles.cardTitle}>Church announcements</Text>
           {contentNotice ? (
             <View style={styles.noticeBox}>
               <Text style={styles.noticeText}>{contentNotice}</Text>
@@ -920,7 +990,7 @@ function ApprovedPreviewScreen({
           </View>
         </View>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Upcoming events</Text>
+          <Text style={styles.cardTitle}>Upcoming gatherings</Text>
           <View style={styles.contentList}>
             {events.length > 0 ? (
               events.slice(0, 3).map((event, index) => (
@@ -941,12 +1011,38 @@ function ApprovedPreviewScreen({
         </View>
       </View>
       <View style={styles.grid}>
-        {roleSummary.map((item) => (
-          <View key={item.title} style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardBody}>{item.body}</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Your church details</Text>
+          <View style={styles.contentList}>
+            <View style={[styles.contentItem, styles.contentItemFirst]}>
+              <Text style={styles.contentMeta}>Sunday gathering</Text>
+              <Text style={styles.contentHeading}>{church.serviceTimes}</Text>
+              <Text style={styles.cardBody}>{church.address}</Text>
+            </View>
+            <View style={styles.contentItem}>
+              <Text style={styles.contentMeta}>Church contact</Text>
+              <Text style={styles.contentHeading}>{church.contactEmail}</Text>
+              <Text style={styles.cardBody}>Use this contact when you need local support, venue details, or ministry follow-up.</Text>
+            </View>
           </View>
-        ))}
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>How Sunday responses work</Text>
+          <View style={styles.contentList}>
+            <View style={[styles.contentItem, styles.contentItemFirst]}>
+              <Text style={styles.contentHeading}>Pending</Text>
+              <Text style={styles.cardBody}>A leader has assigned you to serve. Accept or decline so the team can finalise the Sunday plan.</Text>
+            </View>
+            <View style={styles.contentItem}>
+              <Text style={styles.contentHeading}>Accepted</Text>
+              <Text style={styles.cardBody}>Your role stays visible, and you can still decline later if something changes before Sunday.</Text>
+            </View>
+            <View style={styles.contentItem}>
+              <Text style={styles.contentHeading}>Declined</Text>
+              <Text style={styles.cardBody}>Leaders can reassign the role, and you can still switch back to accept if the plan changes.</Text>
+            </View>
+          </View>
+        </View>
       </View>
       <View style={styles.actionRow}>
         <PrimaryButton label="Sign Out" onPress={onReset} />
@@ -1077,14 +1173,18 @@ function LinkButton({
   label,
   url,
   onOpenUrl,
+  onPress,
+  active,
 }: {
   label: string;
-  url: string;
-  onOpenUrl: (url: string) => void;
+  url?: string;
+  onOpenUrl?: (url: string) => void;
+  onPress?: () => void;
+  active?: boolean;
 }) {
   return (
-    <Pressable onPress={() => onOpenUrl(url)} style={styles.linkButton}>
-      <Text style={styles.linkButtonText}>{label}</Text>
+    <Pressable onPress={onPress ?? (() => url && onOpenUrl?.(url))} style={[styles.linkButton, active && styles.linkButtonActive]}>
+      <Text style={[styles.linkButtonText, active && styles.linkButtonTextActive]}>{label}</Text>
     </Pressable>
   );
 }
@@ -1146,7 +1246,7 @@ function formatEventRange(startAt: string, endAt: string) {
 }
 
 function formatAssignmentDate(value: string) {
-  const date = new Date(value);
+  const date = parseCalendarDate(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -1156,6 +1256,15 @@ function formatAssignmentDate(value: string) {
     month: 'short',
     day: 'numeric',
   }).format(date);
+}
+
+function parseCalendarDate(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map((segment) => Number(segment));
+    return new Date(year, month - 1, day);
+  }
+
+  return new Date(value);
 }
 
 const styles = StyleSheet.create({
@@ -1243,7 +1352,12 @@ const styles = StyleSheet.create({
   linkPanelTitle: { color: colors.white, fontSize: 22, fontWeight: '800', lineHeight: 28, marginBottom: 14 },
   linkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   linkButton: { backgroundColor: colors.white, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12 },
+  linkButtonActive: { backgroundColor: colors.gold },
   linkButtonText: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  linkButtonTextActive: { color: colors.ink },
+  aboutPanel: { marginTop: 16, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 22, padding: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  aboutPanelTitle: { color: colors.white, fontSize: 20, fontWeight: '800', lineHeight: 26, marginBottom: 10 },
+  aboutPanelBody: { color: '#D4DFEA', fontSize: 15, lineHeight: 22, marginBottom: 14 },
   panel: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.softLine, borderRadius: 24, padding: 18, marginBottom: 20 },
   panelTitle: { color: colors.midnight, fontSize: 18, fontWeight: '800', marginBottom: 10 },
   contentMetricRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
@@ -1284,6 +1398,11 @@ const styles = StyleSheet.create({
   assignmentTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   assignmentCopy: { flex: 1 },
   assignmentActionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  planHeroCard: { backgroundColor: colors.parchment, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: colors.softLine, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
+  planHeroCopy: { flex: 1 },
+  planHeroLabel: { color: colors.teal, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  planHeroTitle: { color: colors.midnight, fontSize: 20, fontWeight: '800', lineHeight: 25 },
+  planHeroMeta: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 6 },
   assignmentStatusBadge: { borderRadius: 999, backgroundColor: colors.parchment, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: colors.softLine },
   assignmentStatusAccepted: { backgroundColor: colors.mint, borderColor: colors.mint },
   assignmentStatusDeclined: { backgroundColor: colors.coral, borderColor: colors.coral },

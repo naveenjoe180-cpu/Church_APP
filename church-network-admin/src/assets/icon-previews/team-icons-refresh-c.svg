@@ -1,0 +1,88 @@
+<svg width="1160" height="760" viewBox="0 0 1160 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1160" height="760" rx="28" fill="#F6EFE8"/>
+  <rect x="24" y="24" width="1112" height="712" rx="24" fill="#FFF9F5" stroke="#D7C4B8"/>
+  <text x="56" y="86" fill="#19344E" font-family="Georgia, serif" font-size="38" font-weight="700">Team Icons Sample C</text>
+  <text x="56" y="118" fill="#7A665A" font-family="Arial, sans-serif" font-size="20">Badge-style symbols with a richer church feel</text>
+
+  <defs>
+    <g id="card">
+      <rect width="242" height="248" rx="24" fill="#FFFCF8" stroke="#D7C4B8"/>
+    </g>
+    <g id="badge">
+      <circle cx="0" cy="0" r="64" fill="#FFF7EE" stroke="#D8A365" stroke-width="6"/>
+    </g>
+    <g id="worship">
+      <path d="M-34 8C-30 -12 -24 -24 -14 -24C-6 -24 0 -14 4 8" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <path d="M6 12C10 -12 18 -30 30 -30C40 -30 48 -14 52 12" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="-14" cy="-36" r="8" stroke="#19344E" stroke-width="6"/>
+      <circle cx="30" cy="-44" r="9" stroke="#19344E" stroke-width="6"/>
+      <path d="M-56 -12C-44 -20 -30 -12 -30 2" stroke="#B8694D" stroke-width="5" stroke-linecap="round"/>
+      <path d="M56 -20C70 -28 84 -18 84 -2" stroke="#B8694D" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <g id="school">
+      <path d="M-44 24H48" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="-16" cy="-10" r="8" stroke="#19344E" stroke-width="6"/>
+      <circle cx="14" cy="-24" r="10" stroke="#19344E" stroke-width="6"/>
+      <circle cx="40" cy="-10" r="8" stroke="#19344E" stroke-width="6"/>
+      <path d="M-28 22C-24 4 -20 -2 -16 -2C-12 -2 -8 4 -4 22" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <path d="M0 20C5 0 10 -10 14 -10C20 -10 25 0 28 20" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <path d="M30 22C34 4 36 -2 40 -2C44 -2 48 4 52 22" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <g id="speakers">
+      <path d="M-18 30H18" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-10 30L-5 2H5L10 30" stroke="#19344E" stroke-width="6" stroke-linejoin="round"/>
+      <circle cx="0" cy="-18" r="10" stroke="#19344E" stroke-width="6"/>
+      <path d="M-12 0C-8 -10 -4 -14 0 -14C4 -14 8 -10 12 0" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <path d="M32 -16C44 -20 54 -12 54 0" stroke="#B8694D" stroke-width="5" stroke-linecap="round"/>
+      <path d="M40 -30C58 -36 72 -22 72 -2" stroke="#B8694D" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <g id="tech">
+      <rect x="-44" y="-30" width="72" height="48" rx="10" stroke="#19344E" stroke-width="6"/>
+      <path d="M-8 24V36" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <path d="M-26 40H10" stroke="#19344E" stroke-width="6" stroke-linecap="round"/>
+      <path d="M42 -24V16" stroke="#B8694D" stroke-width="6" stroke-linecap="round"/>
+      <path d="M64 -12V28" stroke="#4C8C6A" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="42" cy="-2" r="8" fill="#FFF9F5" stroke="#B8694D" stroke-width="5"/>
+      <circle cx="64" cy="12" r="8" fill="#FFF9F5" stroke="#4C8C6A" stroke-width="5"/>
+    </g>
+  </defs>
+
+  <g transform="translate(56 164)">
+    <g transform="translate(0 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)">
+        <use href="#badge"/>
+        <use href="#worship"/>
+      </g>
+      <text x="24" y="194" fill="#19344E" font-family="Arial, sans-serif" font-size="24" font-weight="700">Worship Team</text>
+      <text x="24" y="220" fill="#7A665A" font-family="Arial, sans-serif" font-size="15">Choir badge</text>
+    </g>
+    <g transform="translate(264 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)">
+        <use href="#badge"/>
+        <use href="#school"/>
+      </g>
+      <text x="24" y="194" fill="#19344E" font-family="Arial, sans-serif" font-size="24" font-weight="700">Sunday School Team</text>
+      <text x="24" y="220" fill="#7A665A" font-family="Arial, sans-serif" font-size="15">Learning circle badge</text>
+    </g>
+    <g transform="translate(528 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)">
+        <use href="#badge"/>
+        <use href="#speakers"/>
+      </g>
+      <text x="24" y="194" fill="#19344E" font-family="Arial, sans-serif" font-size="24" font-weight="700">Speakers Team</text>
+      <text x="24" y="220" fill="#7A665A" font-family="Arial, sans-serif" font-size="15">Pulpit badge</text>
+    </g>
+    <g transform="translate(792 0)">
+      <use href="#card"/>
+      <g transform="translate(122 106)">
+        <use href="#badge"/>
+        <use href="#tech"/>
+      </g>
+      <text x="24" y="194" fill="#19344E" font-family="Arial, sans-serif" font-size="24" font-weight="700">Tech Team</text>
+      <text x="24" y="220" fill="#7A665A" font-family="Arial, sans-serif" font-size="15">Screen and sound badge</text>
+    </g>
+  </g>
+</svg>
