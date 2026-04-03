@@ -29,12 +29,15 @@ export const firebaseConfigStatus = firebaseConfigKeys.map((key) => ({
 
 export const isFirebaseConfigured = firebaseConfigStatus.every((item) => item.configured);
 
+export const notificationConfig = {
+  webVapidKey: process.env.EXPO_PUBLIC_FIREBASE_VAPID_KEY ?? '',
+  expoProjectId: process.env.EXPO_PUBLIC_EXPO_PROJECT_ID ?? '',
+};
+
 export const firebaseNextSteps = [
-  'Create a Firebase project for the church network.',
-  'Enable Google sign-in and email/password authentication.',
-  'Create a Firestore database and add security rules.',
-  'Add web app credentials to EXPO_PUBLIC_FIREBASE_* variables.',
-  'Create Cloud Functions for admin approval, role sync, and notifications.',
+  'Deploy the Cloud Functions notification worker and grant it access to Firebase Messaging.',
+  'Add the Expo project ID so mobile devices can register for push notifications.',
+  'Connect document and file flows to the planned Google Shared Drive experience.',
 ];
 
 let firebaseAppInstance: FirebaseApp | null = null;

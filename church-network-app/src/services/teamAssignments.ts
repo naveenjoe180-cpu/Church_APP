@@ -5,20 +5,49 @@ import { mockAssignments, type MemberAssignment } from '../data/churchUpdates';
 
 export type { MemberAssignment } from '../data/churchUpdates';
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseCalendarDate(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map((segment) => Number(segment));
+    return new Date(year, month - 1, day);
+  }
+
+  return new Date(value);
+}
+
+function normalizeSundayDateKey(value: string) {
+  const parsedDate = parseCalendarDate(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+
+  if (parsedDate.getDay() === 6) {
+    parsedDate.setDate(parsedDate.getDate() + 1);
+  }
+
+  return formatDateKey(parsedDate);
+}
+
 function normalizeString(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
 
 function normalizeDate(value: Timestamp | string | null | undefined, fallback: string) {
   if (!value) {
-    return fallback;
+    return normalizeSundayDateKey(fallback);
   }
 
   if (typeof value === 'string') {
-    return value;
+    return normalizeSundayDateKey(value);
   }
 
-  return value.toDate().toISOString().slice(0, 10);
+  return normalizeSundayDateKey(formatDateKey(value.toDate()));
 }
 
 function normalizeError(error: FirestoreError | Error | unknown, fallback: string) {
@@ -52,10 +81,10 @@ function mapAssignment(id: string, rawValue: Record<string, unknown>): MemberAss
 function buildAssignmentGroupKey(assignment: MemberAssignment) {
   return [
     assignment.churchId,
-    assignment.serviceDate,
+    normalizeSundayDateKey(assignment.serviceDate),
     assignment.teamName.trim().toLowerCase(),
     assignment.roleName.trim().toLowerCase(),
-    assignment.assignedUserId ?? assignment.assignedTo.trim().toLowerCase(),
+    (assignment.assignedUserId ?? assignment.assignedTo).trim().toLowerCase(),
   ].join('::');
 }
 
@@ -75,8 +104,14 @@ function dedupeAssignments(assignments: MemberAssignment[]) {
   const groupedAssignments = new Map<string, MemberAssignment[]>();
 
   assignments.forEach((assignment) => {
-    const groupKey = buildAssignmentGroupKey(assignment);
-    groupedAssignments.set(groupKey, [...(groupedAssignments.get(groupKey) ?? []), assignment]);
+    const normalizedAssignment: MemberAssignment = {
+      ...assignment,
+      serviceDate: normalizeSundayDateKey(assignment.serviceDate),
+      teamName: assignment.teamName.trim(),
+      roleName: assignment.roleName.trim(),
+    };
+    const groupKey = buildAssignmentGroupKey(normalizedAssignment);
+    groupedAssignments.set(groupKey, [...(groupedAssignments.get(groupKey) ?? []), normalizedAssignment]);
   });
 
   return Array.from(groupedAssignments.values())

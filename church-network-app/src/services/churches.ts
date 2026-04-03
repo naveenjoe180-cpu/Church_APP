@@ -7,18 +7,31 @@ function normalizeString(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
 
+function ensureBethelPrefix(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return trimmedValue;
+  }
+
+  return /^bethel\s+/i.test(trimmedValue) ? trimmedValue : `Bethel ${trimmedValue}`;
+}
+
 function mapChurch(id: string, rawValue: Record<string, unknown>): NetworkChurch {
   const fallbackChurch = networkChurches.find((church) => church.id === id) ?? networkChurches[0];
 
   return {
     id,
-    name: normalizeString(rawValue.name, fallbackChurch?.name ?? id),
+    name: ensureBethelPrefix(normalizeString(rawValue.name, fallbackChurch?.name ?? id)),
     city: normalizeString(rawValue.city, fallbackChurch?.city ?? ''),
-    displayCity: normalizeString(rawValue.displayCity, fallbackChurch?.displayCity ?? id),
+    displayCity: ensureBethelPrefix(normalizeString(rawValue.displayCity, fallbackChurch?.displayCity ?? id)),
     address: normalizeString(rawValue.address, fallbackChurch?.address ?? ''),
     serviceTimes: normalizeString(rawValue.serviceTimes, fallbackChurch?.serviceTimes ?? ''),
     googleMapsLabel: normalizeString(rawValue.googleMapsLabel, fallbackChurch?.googleMapsLabel ?? ''),
     contactEmail: normalizeString(rawValue.contactEmail, fallbackChurch?.contactEmail ?? 'info@bethel-pentecostal.org'),
+    contactPhone: normalizeString(rawValue.contactPhone, fallbackChurch?.contactPhone ?? '+49 172 5818673'),
+    whatsappUrl: normalizeString(rawValue.whatsappUrl, fallbackChurch?.whatsappUrl ?? 'https://wa.me/491725818673'),
+    weeklyMeetingUrl: normalizeString(rawValue.weeklyMeetingUrl, fallbackChurch?.weeklyMeetingUrl ?? '') || undefined,
+    youtubeUrl: normalizeString(rawValue.youtubeUrl, fallbackChurch?.youtubeUrl ?? '') || undefined,
     instagramUrl: normalizeString(rawValue.instagramUrl) || undefined,
     facebookUrl: normalizeString(rawValue.facebookUrl) || undefined,
   };

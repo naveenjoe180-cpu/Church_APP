@@ -10,6 +10,15 @@ function normalizeString(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
 
+function ensureBethelPrefix(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return trimmedValue;
+  }
+
+  return /^bethel\s+/i.test(trimmedValue) ? trimmedValue : `Bethel ${trimmedValue}`;
+}
+
 function normalizeNumber(value: unknown, fallback = 0) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -44,15 +53,17 @@ function mapChurch(id: string, rawValue: Record<string, unknown>): Church {
 
   return {
     id,
-    name: normalizeString(rawValue.name, fallbackChurch?.name ?? id),
+    name: ensureBethelPrefix(normalizeString(rawValue.name, fallbackChurch?.name ?? id)),
     city: normalizeString(rawValue.city, fallbackChurch?.city ?? ''),
-    displayCity: normalizeString(rawValue.displayCity, fallbackChurch?.displayCity ?? id),
+    displayCity: ensureBethelPrefix(normalizeString(rawValue.displayCity, fallbackChurch?.displayCity ?? id)),
     address: normalizeString(rawValue.address, fallbackChurch?.address ?? ''),
     admins: normalizeNumber(rawValue.admins, fallbackChurch?.admins ?? 0),
     members: normalizeNumber(rawValue.members, fallbackChurch?.members ?? 0),
     serviceTimes: normalizeString(rawValue.serviceTimes, fallbackChurch?.serviceTimes ?? ''),
     sharedDrivePath: normalizeString(rawValue.sharedDrivePath, fallbackChurch?.sharedDrivePath ?? ''),
     googleMapsLabel: normalizeString(rawValue.googleMapsLabel, fallbackChurch?.googleMapsLabel ?? ''),
+    contactEmail: normalizeString(rawValue.contactEmail) || fallbackChurch?.contactEmail,
+    contactPhone: normalizeString(rawValue.contactPhone) || fallbackChurch?.contactPhone,
     instagramUrl: normalizeString(rawValue.instagramUrl) || fallbackChurch?.instagramUrl,
     facebookUrl: normalizeString(rawValue.facebookUrl) || fallbackChurch?.facebookUrl,
     teams: mergeTeams(

@@ -1,8 +1,9 @@
-import { doc, onSnapshot, type FirestoreError } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, setDoc, type FirestoreError } from 'firebase/firestore';
 
 import { firestoreDb } from '../config/firebase';
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export type PhoneVerificationStatus = 'missing' | 'pending' | 'verified';
 
 export type MemberProfile = {
   uid: string;
@@ -11,6 +12,11 @@ export type MemberProfile = {
   approvalStatus: ApprovalStatus;
   primaryChurchId: string;
   pendingChurchId: string;
+  phoneNumber: string;
+  phoneVerificationStatus: PhoneVerificationStatus;
+  phoneVerifiedAt: string;
+  roleKey: 'networkSuperAdmin' | 'churchAdmin' | 'pastor' | 'teamLeader' | 'volunteer' | 'member';
+  teamNames: string[];
   roleFlags: Record<string, boolean>;
 };
 
@@ -29,6 +35,43 @@ function normalizeRoleFlags(value: unknown) {
     }
     return flags;
   }, {});
+}
+
+function normalizePhoneVerificationStatus(value: unknown): PhoneVerificationStatus {
+  if (value === 'verified' || value === 'pending' || value === 'missing') {
+    return value;
+  }
+
+  return 'missing';
+}
+
+function normalizeTeamNames(value: unknown) {
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+
+  return Object.entries(value as Record<string, unknown>)
+    .filter(([, enabled]) => enabled === true)
+    .map(([teamName]) => teamName)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function getRoleKey(roleFlags: Record<string, boolean>, teamNames: string[]) {
+  if (roleFlags.networkSuperAdmin) return 'networkSuperAdmin' as const;
+  if (roleFlags.churchAdmin) return 'churchAdmin' as const;
+  if (roleFlags.pastor) return 'pastor' as const;
+  if (roleFlags.teamLeader) return 'teamLeader' as const;
+  if (teamNames.length > 0 || roleFlags.volunteer) return 'volunteer' as const;
+  return 'member' as const;
+}
+
+function normalizeTimestamp(value: unknown) {
+  if (!value || typeof value !== 'object' || !('toDate' in value) || typeof value.toDate !== 'function') {
+    return '';
+  }
+
+  const date = value.toDate();
+  return date instanceof Date && !Number.isNaN(date.getTime()) ? date.toISOString() : '';
 }
 
 function normalizeError(error: FirestoreError | Error | unknown, fallback: string) {
@@ -69,6 +112,8 @@ export function subscribeToMemberProfile(
       }
 
       const rawValue = snapshot.data() as Record<string, unknown>;
+      const roleFlags = normalizeRoleFlags(rawValue.roleFlags);
+      const teamNames = normalizeTeamNames(rawValue.teamAccess);
       onData({
         uid,
         email: normalizeString(rawValue.email),
@@ -79,11 +124,49 @@ export function subscribeToMemberProfile(
             : 'pending',
         primaryChurchId: normalizeString(rawValue.primaryChurchId),
         pendingChurchId: normalizeString(rawValue.pendingChurchId),
-        roleFlags: normalizeRoleFlags(rawValue.roleFlags),
+        phoneNumber: normalizeString(rawValue.phoneNumber),
+        phoneVerificationStatus: normalizePhoneVerificationStatus(rawValue.phoneVerificationStatus),
+        phoneVerifiedAt: normalizeTimestamp(rawValue.phoneVerifiedAt),
+        roleKey: getRoleKey(roleFlags, teamNames),
+        teamNames,
+        roleFlags,
       });
     },
     (error) => {
       onError?.(normalizeError(error, 'Unable to load the member approval status.'));
     },
+  );
+}
+
+export async function saveMemberPhoneVerificationPending(uid: string, phoneNumber: string) {
+  if (!firestoreDb) {
+    throw new Error('Firebase is not configured for the member app.');
+  }
+
+  await setDoc(
+    doc(firestoreDb, 'users', uid),
+    {
+      phoneNumber: phoneNumber.trim() || null,
+      phoneVerificationStatus: phoneNumber.trim() ? 'pending' : 'missing',
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+export async function markMemberPhoneVerified(uid: string, phoneNumber: string) {
+  if (!firestoreDb) {
+    throw new Error('Firebase is not configured for the member app.');
+  }
+
+  await setDoc(
+    doc(firestoreDb, 'users', uid),
+    {
+      phoneNumber: phoneNumber.trim(),
+      phoneVerificationStatus: 'verified',
+      phoneVerifiedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
   );
 }

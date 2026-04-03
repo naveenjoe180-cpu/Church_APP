@@ -4,28 +4,39 @@ import { doc, getDoc } from 'firebase/firestore';
 import { firebaseConfigStatus, firestoreDb, isFirebaseConfigured } from './config/firebase';
 import {
   addChurchTeam,
+  cancelCommonMeetingOccurrence,
+  cancelChurchSpecificMeetingOccurrence,
   createChurchLocation,
   createManagedMember,
   createVolunteerAssignment,
+  deleteAnnouncement,
+  deleteEvent,
+  deletePrayerRequest,
   deleteVolunteerAssignment,
   publishAnnouncement,
   publishEvent,
   removeChurchTeam,
+  subscribeToAuditEntries,
   subscribeToAccessRequests,
   subscribeToAnnouncements,
+  subscribeToCommonMeetingCancellations,
+  subscribeToChurchSpecificMeetingCancellations,
   subscribeToEvents,
   subscribeToMembers,
   subscribeToPrayerRequests,
   subscribeToVolunteerAssignments,
+  restoreCommonMeetingOccurrence,
+  restoreChurchSpecificMeetingOccurrence,
+  updateChurchLocation,
   updateAccessRequestStatus,
   updateMemberAssignments,
   updatePrayerRequestStatus,
+  writeAuditEntry,
 } from './services/firebaseData';
 import { subscribeToChurches } from './services/churches';
 import {
   ensureAdminUserProfile,
   onAdminAuthChanged,
-  signInAdminWithEmail,
   signInAdminWithGoogle,
   signOutAdmin,
   type AdminSession,
@@ -43,6 +54,7 @@ import {
 } from './data/mockData';
 import type {
   AccessRequest,
+  AuditEntry,
   Church,
   ChurchAnnouncement,
   ChurchEventItem,
@@ -52,7 +64,29 @@ import type {
   VolunteerAssignment,
 } from './types';
 
-type ViewKey = 'overview' | 'approvals' | 'members' | 'planning' | 'updates' | 'churches' | 'prayers' | 'roles';
+type ViewKey = 'overview' | 'approvals' | 'members' | 'planning' | 'updates' | 'churches' | 'roles';
+
+type CommonMeetingOccurrence = {
+  key: string;
+  title: string;
+  description: string;
+  location: string;
+  startAt: string;
+  endAt: string;
+  occurrenceDate: string;
+  isCancelled: boolean;
+};
+
+type ChurchSpecificMeetingOccurrence = {
+  key: string;
+  title: string;
+  description: string;
+  location: string;
+  startAt: string;
+  endAt: string;
+  occurrenceDate: string;
+  isCancelled: boolean;
+};
 
 type AdminProfile = {
   hasDashboardPermission: boolean;
@@ -104,6 +138,22 @@ type ManagedMemberForm = {
   teamNames: string[];
 };
 
+type ChurchEditDraft = {
+  name: string;
+  city: string;
+  displayCity: string;
+  address: string;
+  serviceTimes: string;
+  sharedDrivePath: string;
+  googleMapsLabel: string;
+  contactEmail: string;
+  contactPhone: string;
+  instagramUrl: string;
+  facebookUrl: string;
+};
+
+type AnnouncementVisibilityMode = '7days' | '14days' | '30days' | 'untilDate';
+
 type ArchivedServicePlan = {
   serviceDate: string;
   activities: Array<{
@@ -125,9 +175,8 @@ const navigation = [
   { key: 'approvals', label: 'Approval Queue' },
   { key: 'members', label: 'Members' },
   { key: 'planning', label: 'Team Planning' },
-  { key: 'updates', label: 'Church Updates' },
+  { key: 'updates', label: 'Announcements and Events' },
   { key: 'churches', label: 'Churches And Teams' },
-  { key: 'prayers', label: 'Prayer Moderation' },
   { key: 'roles', label: 'Role Matrix' },
 ] as const;
 
@@ -136,9 +185,8 @@ const viewTitle: Record<ViewKey, string> = {
   approvals: 'Approval Queue',
   members: 'Members',
   planning: 'Team Planning',
-  updates: 'Church Updates',
+  updates: 'Announcements and Events',
   churches: 'Churches And Teams',
-  prayers: 'Prayer Moderation',
   roles: 'Role Matrix',
 };
 
@@ -147,9 +195,8 @@ const viewSummary: Record<ViewKey, string> = {
   approvals: 'Review new requests church by church and keep onboarding clear for local admins and leaders.',
   members: 'Manage approved members, their effective role, and the teams they serve in for each church.',
   planning: 'Shape Sunday service flow, assign one person per role, and archive completed Sundays for later review.',
-  updates: 'Publish local announcements and church events with addresses and audience scope tied to the selected church.',
+  updates: 'Publish local announcements and manage church-specific and common events for the selected church.',
   churches: 'Add church locations, keep church details current, and review each church team structure.',
-  prayers: 'Moderate prayer requests with the church scope already applied so each location handles its own queue.',
   roles: 'Review the permission model for super admins, church admins, pastors, team leaders, volunteers, and members.',
 };
 
@@ -174,10 +221,133 @@ const defaultServiceOrderBlueprint: Omit<ServiceActivity, 'id'>[] = [
   { activityName: 'Setup and Team Down', teamName: 'Service Flow', description: 'Setup and tear-down support open to church members.', roleMode: 'singleRole', roleName: 'Setup and Team Down' },
 ];
 
+const commonMeetingTemplates = [
+  {
+    key: 'daily-intercessory-prayer',
+    title: 'Daily Intercessory Prayer',
+    description: 'Shared prayer gathering across Bethel churches in Germany.',
+    matchesDay: (dayOfWeek: number) => dayOfWeek !== 0,
+    startHour: 6,
+    startMinute: 0,
+    endHour: 7,
+    endMinute: 0,
+  },
+  {
+    key: 'mid-week-meeting',
+    title: 'Mid Week Meeting',
+    description: 'Weekly Bethel mid-week meeting for worship, Bible teaching, and prayer.',
+    matchesDay: (dayOfWeek: number) => dayOfWeek === 3,
+    startHour: 19,
+    startMinute: 0,
+    endHour: 20,
+    endMinute: 30,
+  },
+  {
+    key: 'youth-meeting',
+    title: 'Youth Meeting',
+    description: 'Weekly youth gathering for fellowship, worship, and discipleship.',
+    matchesDay: (dayOfWeek: number) => dayOfWeek === 5,
+    startHour: 20,
+    startMinute: 0,
+    endHour: 21,
+    endMinute: 30,
+  },
+] as const;
+
+const churchSpecificMeetingTemplatesByChurch: Record<string, Array<{
+  key: string;
+  title: string;
+  description: string;
+  matchesDay: (dayOfWeek: number) => boolean;
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+}>> = {
+  nuremberg: [
+    {
+      key: 'bible-reading',
+      title: 'Bible Reading',
+      description: 'A church-specific Bible reading meeting for Nuremberg members.',
+      matchesDay: (dayOfWeek: number) => dayOfWeek === 1,
+      startHour: 20,
+      startMinute: 0,
+      endHour: 21,
+      endMinute: 0,
+    },
+    {
+      key: 'church-intercessory-prayer',
+      title: 'Church Intercessory Prayer',
+      description: 'A Nuremberg church intercessory prayer gathering for local church needs and ministry covering.',
+      matchesDay: (dayOfWeek: number) => dayOfWeek === 2,
+      startHour: 21,
+      startMinute: 0,
+      endHour: 21,
+      endMinute: 30,
+    },
+  ],
+};
+
 const initialManagedMemberForm: ManagedMemberForm = { fullName: '', email: '', roleKey: 'member', teamNames: [] };
 
 function createId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function toLocalDateInputValue(value: Date) {
+  const year = value.getFullYear();
+  const month = `${value.getMonth() + 1}`.padStart(2, '0');
+  const day = `${value.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildAnnouncementVisibleUntilAt(mode: AnnouncementVisibilityMode, untilDate: string) {
+  const now = new Date();
+
+  if (mode === 'untilDate') {
+    if (!untilDate) {
+      return undefined;
+    }
+
+    const targetDate = new Date(`${untilDate}T23:59:59`);
+    return Number.isNaN(targetDate.getTime()) ? undefined : targetDate.toISOString();
+  }
+
+  const durationDays = mode === '14days' ? 14 : mode === '30days' ? 30 : 7;
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() + durationDays);
+  targetDate.setHours(23, 59, 59, 999);
+  return targetDate.toISOString();
+}
+
+function isAnnouncementActive(announcement: ChurchAnnouncement) {
+  if (!announcement.visibleUntilAt) {
+    return true;
+  }
+
+  const visibleUntil = new Date(announcement.visibleUntilAt).getTime();
+  if (Number.isNaN(visibleUntil)) {
+    return true;
+  }
+
+  return visibleUntil >= Date.now();
+}
+
+function formatAnnouncementVisibleUntil(value?: string) {
+  if (!value) {
+    return 'Active until removed';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Active until removed';
+  }
+
+  return `Visible until ${date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })}`;
 }
 
 function slugify(value: string) {
@@ -377,6 +547,125 @@ function getPastSundayDates(limit: number) {
   return past;
 }
 
+function buildUpcomingCommonMeetingOccurrences(
+  church: Church,
+  cancellationKeys: string[],
+  limit: number,
+): CommonMeetingOccurrence[] {
+  const cancelled = new Set(cancellationKeys);
+  const occurrences: CommonMeetingOccurrence[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let dayOffset = 0; dayOffset < 30 && occurrences.length < limit; dayOffset += 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + dayOffset);
+    const occurrenceDate = formatDateKey(date);
+    const dayOfWeek = date.getDay();
+
+    commonMeetingTemplates.forEach((template) => {
+      if (!template.matchesDay(dayOfWeek) || occurrences.length >= limit) {
+        return;
+      }
+
+      const startAt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), template.startHour, template.startMinute, 0, 0);
+      const endAt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), template.endHour, template.endMinute, 0, 0);
+      occurrences.push({
+        key: template.key,
+        title: template.title,
+        description: template.description,
+        location: 'Online',
+        startAt: startAt.toISOString(),
+        endAt: endAt.toISOString(),
+        occurrenceDate,
+        isCancelled: cancelled.has(`${template.key}:${occurrenceDate}`),
+      });
+    });
+  }
+
+  return occurrences;
+}
+
+function buildUpcomingChurchSpecificMeetingOccurrences(
+  church: Church,
+  cancellationKeys: string[],
+  limit: number,
+): ChurchSpecificMeetingOccurrence[] {
+  const templates = churchSpecificMeetingTemplatesByChurch[church.id] ?? [];
+  if (templates.length === 0) {
+    return [];
+  }
+
+  const cancelled = new Set(cancellationKeys);
+  const occurrences: ChurchSpecificMeetingOccurrence[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let dayOffset = 0; dayOffset < 30 && occurrences.length < limit; dayOffset += 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + dayOffset);
+    const occurrenceDate = formatDateKey(date);
+    const dayOfWeek = date.getDay();
+
+    templates.forEach((template) => {
+      if (!template.matchesDay(dayOfWeek) || occurrences.length >= limit) {
+        return;
+      }
+
+      const startAt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), template.startHour, template.startMinute, 0, 0);
+      const endAt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), template.endHour, template.endMinute, 0, 0);
+      occurrences.push({
+        key: template.key,
+        title: template.title,
+        description: template.description,
+        location: 'Online',
+        startAt: startAt.toISOString(),
+        endAt: endAt.toISOString(),
+        occurrenceDate,
+        isCancelled: cancelled.has(`${template.key}:${occurrenceDate}`),
+      });
+    });
+  }
+
+  return occurrences;
+}
+
+function buildNextSundayServiceOccurrence(church: Church): ChurchEventItem {
+  const now = new Date();
+  const nextSunday = new Date(now);
+  const dayOffset = (7 - now.getDay()) % 7;
+  nextSunday.setDate(now.getDate() + dayOffset);
+  nextSunday.setHours(0, 0, 0, 0);
+
+  const timeMatch = church.serviceTimes.match(/(\d{1,2}):(\d{2})/);
+  const startAt = new Date(nextSunday);
+  if (timeMatch) {
+    startAt.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+  } else {
+    startAt.setHours(10, 0, 0, 0);
+  }
+
+  if (startAt.getTime() <= now.getTime()) {
+    startAt.setDate(startAt.getDate() + 7);
+  }
+
+  const endAt = new Date(startAt.getTime() + 150 * 60 * 1000);
+
+  return {
+    id: `overview-sunday-service-${church.id}-${formatDateKey(startAt)}`,
+    churchId: church.id,
+    scopeType: 'church',
+    scopeLabel: church.displayCity,
+    title: 'Sunday Service',
+    description: `Weekly Sunday service for ${church.displayCity}.`,
+    location: church.address,
+    startAt: startAt.toISOString(),
+    endAt: endAt.toISOString(),
+    createdBy: 'System',
+    isPublic: true,
+  };
+}
+
 function getRoleConfigStorageKey(churchId: string) {
   return `bethel-admin-role-configs:${churchId}`;
 }
@@ -469,6 +758,36 @@ function saveArchivedPlans(churchId: string, plans: ArchivedServicePlan[]) {
   window.localStorage.setItem(getArchiveStorageKey(churchId), JSON.stringify(plans));
 }
 
+function getAuditStorageKey(churchId: string) {
+  return `bethel-admin-audit:${churchId}`;
+}
+
+function loadAuditEntries(churchId: string) {
+  if (typeof window === 'undefined') {
+    return [] as AuditEntry[];
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(getAuditStorageKey(churchId));
+    if (!rawValue) {
+      return [];
+    }
+
+    const parsedValue = JSON.parse(rawValue) as AuditEntry[];
+    return Array.isArray(parsedValue) ? parsedValue : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAuditEntries(churchId: string, entries: AuditEntry[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(getAuditStorageKey(churchId), JSON.stringify(entries));
+}
+
 function getHighestRole(roleFlags: Record<string, unknown> | undefined, teamNames: string[]): RoleKey {
   if (roleFlags?.networkSuperAdmin === true) return 'networkSuperAdmin';
   if (roleFlags?.churchAdmin === true) return 'churchAdmin';
@@ -559,6 +878,33 @@ function getAssignmentsForRequirement(assignments: VolunteerAssignment[], servic
     && assignment.teamName === requirement.teamName
     && assignment.roleName === requirement.roleName,
   );
+}
+
+function buildPlanningConflictSignature(
+  assignments: VolunteerAssignment[],
+  serviceDate: string,
+  requirements: ServiceRequirement[],
+) {
+  return requirements
+    .flatMap((requirement) =>
+      assignments
+        .filter((assignment) =>
+          assignment.serviceDate === serviceDate
+          && assignment.teamName === requirement.teamName
+          && assignment.roleName === requirement.roleName,
+        )
+        .map((assignment) => `${requirement.id}:${assignment.id}:${assignment.assignedUserId ?? assignment.assignedTo}:${assignment.responseStatus}`),
+    )
+    .sort()
+    .join('|');
+}
+
+function getMemberStatusLabel(member: MemberRecord) {
+  if (member.approvalStatus !== 'approved') {
+    return member.approvalStatus;
+  }
+
+  return 'Active';
 }
 
 function buildArchivePlan(serviceDate: string, serviceOrder: ServiceActivity[], roleConfigs: RoleConfig[], assignments: VolunteerAssignment[]) {
@@ -737,6 +1083,22 @@ function formatDateTimeRange(startAt: string, endAt: string) {
   return `${dayLabel} | ${startTime} - ${endTime}`;
 }
 
+function readPosterFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error('Unable to read the selected poster file.'));
+    };
+    reader.onerror = () => reject(new Error('Unable to read the selected poster file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function App() {
   const configuredCount = firebaseConfigStatus.filter((item) => item.configured).length;
   const [activeView, setActiveView] = useState<ViewKey>('overview');
@@ -749,20 +1111,30 @@ function App() {
   });
   const [authError, setAuthError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [emailAuthForm, setEmailAuthForm] = useState({ email: '', password: '' });
   const [churches, setChurches] = useState<Church[]>(mockChurches);
   const [selectedChurchId, setSelectedChurchId] = useState(mockChurches[0]?.id ?? '');
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>(mockAccessRequests);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>(mockPrayerRequests);
   const [announcements, setAnnouncements] = useState<ChurchAnnouncement[]>(mockAnnouncements);
   const [events, setEvents] = useState<ChurchEventItem[]>(mockEvents);
+  const [commonMeetingCancellationKeys, setCommonMeetingCancellationKeys] = useState<string[]>([]);
+  const [churchSpecificMeetingCancellationKeys, setChurchSpecificMeetingCancellationKeys] = useState<string[]>([]);
   const [members, setMembers] = useState<MemberRecord[]>(mockMembers);
   const [assignments, setAssignments] = useState<VolunteerAssignment[]>(mockAssignments);
   const [selectedRequestId, setSelectedRequestId] = useState(mockAccessRequests[0]?.id ?? '');
+  const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
   const [updateMessage, setUpdateMessage] = useState('');
+  const [approvalSearch, setApprovalSearch] = useState('');
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<'all' | AccessRequest['status']>('pending');
+  const [approvalRoleFilter, setApprovalRoleFilter] = useState<'all' | RoleKey>('all');
   const [roleConfigsByChurch, setRoleConfigsByChurch] = useState<Record<string, RoleConfig[]>>({});
   const [serviceOrderByChurch, setServiceOrderByChurch] = useState<Record<string, ServiceActivity[]>>({});
   const [managedMemberForm, setManagedMemberForm] = useState<ManagedMemberForm>(initialManagedMemberForm);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberRoleFilter, setMemberRoleFilter] = useState<'all' | RoleKey>('all');
+  const [memberTeamFilter, setMemberTeamFilter] = useState<'all' | string>('all');
+  const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'unassigned-team'>('all');
+  const [memberSortKey, setMemberSortKey] = useState<'name' | 'role' | 'team' | 'status'>('name');
   const [memberEditId, setMemberEditId] = useState<string | null>(null);
   const [memberEditDrafts, setMemberEditDrafts] = useState<Record<string, { roleKey: RoleKey; teamNames: string[] }>>({});
   const [newTeamName, setNewTeamName] = useState('');
@@ -778,21 +1150,32 @@ function App() {
   const [planningDraftAssignments, setPlanningDraftAssignments] = useState<Record<string, PlanningDraftItem[]>>({});
   const [planningGuestInputs, setPlanningGuestInputs] = useState<Record<string, string>>({});
   const [draggedPlanningMemberId, setDraggedPlanningMemberId] = useState<string | null>(null);
+  const [planningBaselineSignature, setPlanningBaselineSignature] = useState('');
   const [expandedActivityKeys, setExpandedActivityKeys] = useState<Record<string, boolean>>({});
   const [isEditingServiceOrder, setIsEditingServiceOrder] = useState(false);
   const [archivedPlans, setArchivedPlans] = useState<ArchivedServicePlan[]>([]);
   const [selectedArchiveSunday, setSelectedArchiveSunday] = useState('');
   const [loadedArchivePlan, setLoadedArchivePlan] = useState<ArchivedServicePlan | null>(null);
+  const [compareArchiveSunday, setCompareArchiveSunday] = useState('');
   const [expandedArchiveActivityKeys, setExpandedArchiveActivityKeys] = useState<Record<string, boolean>>({});
   const archiveDetailRef = useRef<HTMLDivElement | null>(null);
-  const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '', isPublic: false });
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: '',
+    body: '',
+    isPublic: false,
+    visibilityMode: '7days' as AnnouncementVisibilityMode,
+    visibleUntilDate: toLocalDateInputValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+  });
   const [eventForm, setEventForm] = useState({
+    scopeType: 'church' as 'church' | 'network',
     title: '',
     description: '',
     location: mockChurches[0]?.address ?? '',
     startAt: '',
     endAt: '',
-    isPublic: true,
+    posterUrl: '',
+    posterFileName: '',
+    isPublic: false,
   });
   const [churchForm, setChurchForm] = useState({
     name: '',
@@ -802,9 +1185,14 @@ function App() {
     serviceTimes: '',
     sharedDrivePath: '',
     googleMapsLabel: '',
+    contactEmail: '',
+    contactPhone: '',
     instagramUrl: '',
     facebookUrl: '',
   });
+  const [churchEditId, setChurchEditId] = useState<string | null>(null);
+  const [churchEditDrafts, setChurchEditDrafts] = useState<Record<string, ChurchEditDraft>>({});
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
 
   const selectedChurch = churches.find((church) => church.id === selectedChurchId) ?? churches[0] ?? null;
@@ -821,20 +1209,94 @@ function App() {
   const scopedRequests = useMemo(() => accessRequests.filter((request) => !selectedChurch || request.churchId === selectedChurch.id), [accessRequests, selectedChurch]);
   const scopedPrayerRequests = useMemo(() => prayerRequests.filter((request) => !selectedChurch || request.churchId === selectedChurch.id), [prayerRequests, selectedChurch]);
   const scopedAnnouncements = useMemo(() => announcements.filter((announcement) => !selectedChurch || announcement.churchId === selectedChurch.id), [announcements, selectedChurch]);
-  const scopedEvents = useMemo(() => events.filter((event) => !selectedChurch || event.churchId === selectedChurch.id), [events, selectedChurch]);
+  const activeScopedAnnouncements = useMemo(() => scopedAnnouncements.filter(isAnnouncementActive), [scopedAnnouncements]);
+  const scopedEvents = useMemo(
+    () => events.filter((event) => !selectedChurch || event.churchId === selectedChurch.id || event.scopeType === 'network' || event.churchId === 'network'),
+    [events, selectedChurch],
+  );
+  const isCommonPublishedEvent = (event: ChurchEventItem) =>
+    event.scopeType === 'network' || event.churchId === 'network' || event.isPublic === true;
+  const scopedCommonEvents = useMemo(
+    () => scopedEvents.filter((event) => isCommonPublishedEvent(event)),
+    [scopedEvents],
+  );
+  const scopedChurchSpecificEvents = useMemo(
+    () => scopedEvents.filter((event) => !isCommonPublishedEvent(event)),
+    [scopedEvents],
+  );
   const scopedMembers = useMemo(() => members.filter((member) => !selectedChurch || member.churchId === selectedChurch.id), [members, selectedChurch]);
   const scopedAssignments = useMemo(() => assignments.filter((assignment) => !selectedChurch || assignment.churchId === selectedChurch.id), [assignments, selectedChurch]);
+  const filteredRequests = useMemo(() => {
+    const searchTerm = approvalSearch.trim().toLowerCase();
+    return scopedRequests.filter((request) => {
+      const matchesSearch = !searchTerm || [request.fullName, request.email, request.note].some((value) => value.toLowerCase().includes(searchTerm));
+      const matchesStatus = approvalStatusFilter === 'all' || request.status === approvalStatusFilter;
+      const matchesRole = approvalRoleFilter === 'all' || request.requestedRoles.includes(approvalRoleFilter);
+      return matchesSearch && matchesStatus && matchesRole;
+    });
+  }, [approvalRoleFilter, approvalSearch, approvalStatusFilter, scopedRequests]);
+  const visibleMemberRecords = useMemo(() => {
+    const searchTerm = memberSearch.trim().toLowerCase();
+    const nextMembers = scopedMembers.filter((member) => {
+      const matchesSearch =
+        !searchTerm
+        || member.fullName.toLowerCase().includes(searchTerm)
+        || member.email.toLowerCase().includes(searchTerm)
+        || member.teamNames.some((teamName) => teamName.toLowerCase().includes(searchTerm));
+      const matchesRole = memberRoleFilter === 'all' || member.roleKey === memberRoleFilter;
+      const matchesTeam = memberTeamFilter === 'all' || member.teamNames.includes(memberTeamFilter);
+      const matchesStatus =
+        memberStatusFilter === 'all'
+        || (memberStatusFilter === 'active' && member.approvalStatus === 'approved')
+        || (memberStatusFilter === 'unassigned-team' && member.teamNames.length === 0);
+      return matchesSearch && matchesRole && matchesTeam && matchesStatus;
+    });
+
+    return [...nextMembers].sort((left, right) => {
+      if (memberSortKey === 'role') {
+        return roleLabels[left.roleKey].localeCompare(roleLabels[right.roleKey]) || left.fullName.localeCompare(right.fullName);
+      }
+      if (memberSortKey === 'team') {
+        return (left.teamNames[0] ?? '').localeCompare(right.teamNames[0] ?? '') || left.fullName.localeCompare(right.fullName);
+      }
+      if (memberSortKey === 'status') {
+        return getMemberStatusLabel(left).localeCompare(getMemberStatusLabel(right)) || left.fullName.localeCompare(right.fullName);
+      }
+      return left.fullName.localeCompare(right.fullName);
+    });
+  }, [memberRoleFilter, memberSearch, memberSortKey, memberStatusFilter, memberTeamFilter, scopedMembers]);
   const selectedRequest =
-    scopedRequests.find((request) => request.id === selectedRequestId)
-    ?? scopedRequests[0]
+    filteredRequests.find((request) => request.id === selectedRequestId)
+    ?? filteredRequests[0]
     ?? accessRequests.find((request) => request.id === selectedRequestId)
     ?? null;
+  const canManagePlanningStructure = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canPlanAllTeams = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canExportArchive = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canReviewApprovals = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canModeratePrayer = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canManageCommonMeetings = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canManageMembers = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canEditChurch = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canPublishUpdates = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canPublishEvents = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
   const upcomingPlanningSundays = useMemo(() => getUpcomingSundayDates(2), []);
   const archivedPlanningSundays = useMemo(() => getPastSundayDates(260), []);
   const planningActivityOptions = useMemo(() => buildPlanningActivityOptions(selectedChurchServiceOrder), [selectedChurchServiceOrder]);
+  const visiblePlanningActivityOptions = useMemo(() => {
+    if (canPlanAllTeams) {
+      return planningActivityOptions;
+    }
+
+    return planningActivityOptions.filter((option) =>
+      option.teamName
+        .split(', ')
+        .some((teamName) => teamName === 'Service Flow' || adminProfile.teamNames.includes(teamName)),
+    );
+  }, [adminProfile.teamNames, canPlanAllTeams, planningActivityOptions]);
   const selectedPlanningActivity = useMemo(
-    () => planningActivityOptions.find((activity) => activity.key === planningForm.activityKey) ?? null,
-    [planningActivityOptions, planningForm.activityKey],
+    () => visiblePlanningActivityOptions.find((activity) => activity.key === planningForm.activityKey) ?? null,
+    [planningForm.activityKey, visiblePlanningActivityOptions],
   );
   const selectedPlanningActivities = useMemo(
     () => selectedChurchServiceOrder.filter((activity) => selectedPlanningActivity?.activityIds.includes(activity.id)),
@@ -858,9 +1320,88 @@ function App() {
 
     return scopedMembers.filter((member) => member.teamNames.some((teamName) => relevantTeams.has(teamName)));
   }, [planningForm.allowOtherMembers, scopedMembers, selectedPlanningRequirements]);
-  const canManagePlanningStructure = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
-  const canPlanAllTeams = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
-  const canExportArchive = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const sundayAssignments = useMemo(
+    () => scopedAssignments.filter((assignment) => assignment.serviceDate === selectedPlanningSunday),
+    [scopedAssignments, selectedPlanningSunday],
+  );
+  const pendingSundayResponses = useMemo(
+    () => sundayAssignments.filter((assignment) => assignment.responseStatus === 'pending').length,
+    [sundayAssignments],
+  );
+  const uncoveredRequirementsCount = useMemo(() => {
+    const requirements = buildRequirementsForActivities(selectedChurchServiceOrder, selectedChurchRoleConfigs);
+    return requirements.filter((requirement) => getAssignmentsForRequirement(scopedAssignments, selectedPlanningSunday, requirement).length === 0).length;
+  }, [scopedAssignments, selectedChurchRoleConfigs, selectedChurchServiceOrder, selectedPlanningSunday]);
+  const totalSundayRequirements = useMemo(
+    () => buildRequirementsForActivities(selectedChurchServiceOrder, selectedChurchRoleConfigs).length,
+    [selectedChurchRoleConfigs, selectedChurchServiceOrder],
+  );
+  const sundayCoveragePercent = totalSundayRequirements === 0
+    ? 100
+    : Math.max(0, Math.round(((totalSundayRequirements - uncoveredRequirementsCount) / totalSundayRequirements) * 100));
+  const upcomingCommonMeetings = useMemo(
+    () => selectedChurch ? buildUpcomingCommonMeetingOccurrences(selectedChurch, commonMeetingCancellationKeys, 12) : [],
+    [commonMeetingCancellationKeys, selectedChurch],
+  );
+  const upcomingChurchSpecificMeetings = useMemo(
+    () => selectedChurch ? buildUpcomingChurchSpecificMeetingOccurrences(selectedChurch, churchSpecificMeetingCancellationKeys, 8) : [],
+    [churchSpecificMeetingCancellationKeys, selectedChurch],
+  );
+  const nextEvent = useMemo(() => {
+    if (!selectedChurch) {
+      return null;
+    }
+
+    const now = Date.now();
+    const recurringCandidates: ChurchEventItem[] = [
+      buildNextSundayServiceOccurrence(selectedChurch),
+      ...upcomingCommonMeetings.filter((meeting) => !meeting.isCancelled).map((meeting) => ({
+        id: `common:${meeting.key}:${meeting.occurrenceDate}`,
+        churchId: 'network',
+        scopeType: 'network' as const,
+        scopeLabel: 'Bethel Church',
+        title: meeting.title,
+        description: meeting.description,
+        location: meeting.location,
+        startAt: meeting.startAt,
+        endAt: meeting.endAt,
+        createdBy: 'System',
+        isPublic: true,
+      })),
+      ...upcomingChurchSpecificMeetings.filter((meeting) => !meeting.isCancelled).map((meeting) => ({
+        id: `church:${meeting.key}:${meeting.occurrenceDate}`,
+        churchId: selectedChurch.id,
+        scopeType: 'church' as const,
+        scopeLabel: selectedChurch.displayCity,
+        title: meeting.title,
+        description: meeting.description,
+        location: meeting.location,
+        startAt: meeting.startAt,
+        endAt: meeting.endAt,
+        createdBy: 'System',
+        isPublic: true,
+      })),
+    ];
+
+    const seenIds = new Set<string>();
+    return [...scopedEvents, ...recurringCandidates]
+      .filter((event) => {
+        const endAt = new Date(event.endAt).getTime();
+        return Number.isNaN(endAt) || endAt >= now;
+      })
+      .filter((event) => {
+        if (seenIds.has(event.id)) {
+          return false;
+        }
+        seenIds.add(event.id);
+        return true;
+      })
+      .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())[0] ?? null;
+  }, [scopedEvents, selectedChurch, upcomingChurchSpecificMeetings, upcomingCommonMeetings]);
+  const archiveComparisonPlan = useMemo(
+    () => archivedPlans.find((plan) => plan.serviceDate === compareArchiveSunday) ?? null,
+    [archivedPlans, compareArchiveSunday],
+  );
 
   useEffect(() => {
     return onAdminAuthChanged((session) => {
@@ -957,6 +1498,7 @@ function App() {
       ...current,
       location: selectedChurch.address,
     }));
+    setAuditEntries(loadAuditEntries(selectedChurch.id));
   }, [selectedChurch]);
 
   useEffect(() => {
@@ -979,7 +1521,13 @@ function App() {
       ? subscribeToAnnouncements(activeChurchId, setAnnouncements, () => setAnnouncements(mockAnnouncements))
       : () => undefined;
     const unsubscribeEvents = activeChurchId
-      ? subscribeToEvents(activeChurchId, setEvents, () => setEvents(mockEvents))
+      ? subscribeToEvents(activeChurchId, setEvents)
+      : () => undefined;
+    const unsubscribeCommonMeetingCancellations = activeChurchId
+      ? subscribeToCommonMeetingCancellations(activeChurchId, setCommonMeetingCancellationKeys, () => setCommonMeetingCancellationKeys([]))
+      : () => undefined;
+    const unsubscribeChurchSpecificMeetingCancellations = activeChurchId
+      ? subscribeToChurchSpecificMeetingCancellations(activeChurchId, setChurchSpecificMeetingCancellationKeys, () => setChurchSpecificMeetingCancellationKeys([]))
       : () => undefined;
     const unsubscribeAssignments = subscribeToVolunteerAssignments(activeChurchId, null, setAssignments, () => setAssignments(mockAssignments));
 
@@ -989,9 +1537,34 @@ function App() {
       unsubscribeMembers();
       unsubscribeAnnouncements();
       unsubscribeEvents();
+      unsubscribeCommonMeetingCancellations();
+      unsubscribeChurchSpecificMeetingCancellations();
       unsubscribeAssignments();
     };
   }, [selectedChurch?.id]);
+
+  useEffect(() => {
+    if (!selectedChurch?.id) {
+      return;
+    }
+
+    const unsubscribeAudit = subscribeToAuditEntries(
+      selectedChurch.id,
+      (entries) => {
+        setAuditEntries(entries);
+        saveAuditEntries(selectedChurch.id, entries);
+      },
+      () => setAuditEntries(loadAuditEntries(selectedChurch.id)),
+    );
+
+    return () => {
+      unsubscribeAudit();
+    };
+  }, [selectedChurch?.id]);
+
+  useEffect(() => {
+    setSelectedRequestIds((current) => current.filter((requestId) => filteredRequests.some((request) => request.id === requestId)));
+  }, [filteredRequests]);
 
   useEffect(() => {
     if (!selectedChurch) {
@@ -1038,6 +1611,63 @@ function App() {
     }
   }, [scopeChurchChoices, selectedChurchId]);
 
+  const appendAuditEntry = async (entry: Omit<AuditEntry, 'id' | 'createdAt'>) => {
+    if (!selectedChurch) {
+      return;
+    }
+
+    const localEntry: AuditEntry = {
+      ...entry,
+      id: createId('audit'),
+      createdAt: new Date().toISOString(),
+    };
+
+    setAuditEntries((current) => {
+      const nextEntries = [localEntry, ...current].slice(0, 120);
+      saveAuditEntries(selectedChurch.id, nextEntries);
+      return nextEntries;
+    });
+
+    if (isFirebaseConfigured) {
+      try {
+        await writeAuditEntry({
+          churchId: entry.churchId,
+          entityType: entry.entityType,
+          actionLabel: entry.actionLabel,
+          targetLabel: entry.targetLabel,
+          summary: entry.summary,
+          actor: entry.actor,
+        });
+      } catch {
+        // Keep local audit history even if the shared log write fails.
+      }
+    }
+  };
+
+  const toggleRequestSelection = (requestId: string) => {
+    setSelectedRequestIds((current) => current.includes(requestId) ? current.filter((id) => id !== requestId) : [...current, requestId]);
+  };
+
+  const startChurchEdit = (church: Church) => {
+    setChurchEditId(church.id);
+    setChurchEditDrafts((current) => ({
+      ...current,
+      [church.id]: {
+        name: church.name,
+        city: church.city,
+        displayCity: church.displayCity,
+        address: church.address,
+        serviceTimes: church.serviceTimes,
+        sharedDrivePath: church.sharedDrivePath,
+        googleMapsLabel: church.googleMapsLabel,
+        contactEmail: church.contactEmail ?? '',
+        contactPhone: church.contactPhone ?? '',
+        instagramUrl: church.instagramUrl ?? '',
+        facebookUrl: church.facebookUrl ?? '',
+      },
+    }));
+  };
+
   const handleSignInWithGoogle = async () => {
     setIsAuthenticating(true);
     setAuthError('');
@@ -1068,46 +1698,59 @@ function App() {
     }
   };
 
-  const handleSignInWithEmail = async () => {
-    setIsAuthenticating(true);
-    setAuthError('');
-    try {
-      if (!emailAuthForm.email.trim() || !emailAuthForm.password.trim()) {
-        throw new Error('Add both email and password to continue.');
-      }
-
-      const session = await signInAdminWithEmail(emailAuthForm.email, emailAuthForm.password);
-      setAdminSession(session);
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Unable to sign in with email right now.');
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
-
   const handleSignOut = async () => {
     await signOutAdmin();
     setAdminSession(null);
     setAuthError('');
   };
 
-  const handleApproveRequest = async (nextStatus: 'approved' | 'rejected') => {
-    if (!selectedRequest) {
+  const handleApproveRequest = async (nextStatus: 'approved' | 'rejected', requestsOverride?: AccessRequest[]) => {
+    if (!canReviewApprovals) {
+      setUpdateMessage('Only super admins, church admins, and pastors can review approvals.');
+      return;
+    }
+
+    const requestsToUpdate = requestsOverride ?? (selectedRequest ? [selectedRequest] : []);
+    if (requestsToUpdate.length === 0) {
       return;
     }
 
     try {
       if (isFirebaseConfigured) {
-        await updateAccessRequestStatus(selectedRequest, nextStatus, selectedRequest.requestedRoles);
+        await Promise.all(
+          requestsToUpdate.map((request) => updateAccessRequestStatus(request, nextStatus, request.requestedRoles)),
+        );
       }
-      setAccessRequests((current) => current.map((request) => request.id === selectedRequest.id ? { ...request, status: nextStatus } : request));
-      setUpdateMessage(nextStatus === 'approved' ? `Approved ${selectedRequest.fullName}.` : `Rejected ${selectedRequest.fullName}.`);
+      const requestIds = new Set(requestsToUpdate.map((request) => request.id));
+      setAccessRequests((current) => current.map((request) => requestIds.has(request.id) ? { ...request, status: nextStatus } : request));
+      setSelectedRequestIds([]);
+      const affectedNames = requestsToUpdate.map((request) => request.fullName).join(', ');
+      setUpdateMessage(
+        nextStatus === 'approved'
+          ? `Approved ${requestsToUpdate.length} request${requestsToUpdate.length > 1 ? 's' : ''}: ${affectedNames}.`
+          : `Rejected ${requestsToUpdate.length} request${requestsToUpdate.length > 1 ? 's' : ''}: ${affectedNames}.`,
+      );
+      await Promise.all(
+        requestsToUpdate.map((request) => appendAuditEntry({
+          churchId: request.churchId,
+          entityType: 'approval',
+          actionLabel: nextStatus === 'approved' ? 'Approved request' : 'Rejected request',
+          targetLabel: request.fullName,
+          summary: `${roleLabels[adminProfile.roleKey]} ${adminSession?.email ?? 'admin'} marked the access request as ${nextStatus}.`,
+          actor: adminSession?.email ?? 'Church admin',
+        })),
+      );
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to update the access request.');
     }
   };
 
   const handleModeratePrayer = async (requestId: string, nextStatus: 'approved' | 'hidden') => {
+    if (!canModeratePrayer) {
+      setUpdateMessage('Only super admins and church admins can moderate prayer requests.');
+      return;
+    }
+
     try {
       if (isFirebaseConfigured) {
         await updatePrayerRequestStatus(requestId, nextStatus);
@@ -1119,8 +1762,28 @@ function App() {
     }
   };
 
+  const handleRemovePrayerRequest = async (requestId: string) => {
+    if (!canModeratePrayer) {
+      setUpdateMessage('Only super admins and church admins can remove prayer requests.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await deletePrayerRequest(requestId);
+      }
+      setPrayerRequests((current) => current.filter((request) => request.id !== requestId));
+      setUpdateMessage('Prayer request removed.');
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to remove the prayer request.');
+    }
+  };
+
   const handleCreateManagedMember = async () => {
-    if (!selectedChurch) {
+    if (!selectedChurch || !canManageMembers) {
+      if (!canManageMembers) {
+        setUpdateMessage('Only super admins, church admins, and pastors can add managed members.');
+      }
       return;
     }
 
@@ -1150,10 +1813,19 @@ function App() {
         teamName: managedMemberForm.teamNames[0] ?? '',
         teamNames: managedMemberForm.teamNames,
         approvalStatus: 'approved',
+        phoneVerificationStatus: 'missing',
       };
       setMembers((current) => [...current, nextMember].sort((left, right) => left.fullName.localeCompare(right.fullName)));
       setManagedMemberForm(initialManagedMemberForm);
       setUpdateMessage(`Created a managed member profile for ${selectedChurch.displayCity}.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'member',
+        actionLabel: 'Created member',
+        targetLabel: nextMember.fullName,
+        summary: `${adminSession?.email ?? 'Church admin'} created a managed member profile with the ${roleLabels[effectiveRole]} role.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to create the managed member profile.');
     }
@@ -1171,6 +1843,10 @@ function App() {
   };
 
   const handleSaveMemberEdit = async (member: MemberRecord) => {
+    if (!canManageMembers) {
+      setUpdateMessage('Only super admins, church admins, and pastors can update members.');
+      return;
+    }
     const draft = memberEditDrafts[member.id];
     if (!draft) {
       return;
@@ -1195,6 +1871,14 @@ function App() {
       );
       setMemberEditId(null);
       setUpdateMessage(`Updated ${member.fullName}.`);
+      await appendAuditEntry({
+        churchId: member.churchId,
+        entityType: 'member',
+        actionLabel: 'Updated member',
+        targetLabel: member.fullName,
+        summary: `${adminSession?.email ?? 'Church admin'} changed the member role to ${roleLabels[effectiveRole]} and updated team assignments.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to save the member update.');
     }
@@ -1218,6 +1902,14 @@ function App() {
       setExpandedTeamName(normalizedTeamName);
       setNewTeamName('');
       setUpdateMessage(`Added ${normalizedTeamName}. Its team tile now appears in Team setup and the Sunday service order stays unchanged.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'team',
+        actionLabel: 'Added team',
+        targetLabel: normalizedTeamName,
+        summary: `${adminSession?.email ?? 'Church admin'} added a new ministry team.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to add the team.');
     }
@@ -1239,6 +1931,14 @@ function App() {
       }));
       setExpandedTeamName('');
       setUpdateMessage(`Removed ${teamName}. Existing assignments stay in history.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'team',
+        actionLabel: 'Removed team',
+        targetLabel: teamName,
+        summary: `${adminSession?.email ?? 'Church admin'} removed a custom ministry team from the church setup.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to remove the team.');
     }
@@ -1271,6 +1971,14 @@ function App() {
     setExpandedTeamName(newRoleForm.teamName);
     setNewRoleForm((current) => ({ ...current, roleName: '' }));
     setUpdateMessage(`Added ${normalizedRoleName} to ${newRoleForm.teamName}.`);
+    void appendAuditEntry({
+      churchId: selectedChurch.id,
+      entityType: 'role',
+      actionLabel: 'Added role',
+      targetLabel: normalizedRoleName,
+      summary: `${adminSession?.email ?? 'Church admin'} added ${normalizedRoleName} to ${newRoleForm.teamName}.`,
+      actor: adminSession?.email ?? 'Church admin',
+    });
   };
 
   const handleDeleteRole = (roleId: string) => {
@@ -1286,6 +1994,14 @@ function App() {
       [selectedChurch.id]: (current[selectedChurch.id] ?? []).filter((role) => role.id !== roleId),
     }));
     setUpdateMessage(`Removed ${removedRole.roleName} from ${removedRole.teamName}.`);
+    void appendAuditEntry({
+      churchId: selectedChurch.id,
+      entityType: 'role',
+      actionLabel: 'Removed role',
+      targetLabel: removedRole.roleName,
+      summary: `${adminSession?.email ?? 'Church admin'} removed ${removedRole.roleName} from ${removedRole.teamName}.`,
+      actor: adminSession?.email ?? 'Church admin',
+    });
   };
 
   const handleMoveActivity = (activityId: string, direction: 'up' | 'down') => {
@@ -1303,6 +2019,17 @@ function App() {
       serviceOrder.splice(nextIndex, 0, movedActivity);
       return { ...current, [selectedChurch.id]: serviceOrder };
     });
+    const movedActivity = selectedChurchServiceOrder.find((activity) => activity.id === activityId);
+    if (movedActivity) {
+      void appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'planning',
+        actionLabel: 'Reordered service activity',
+        targetLabel: movedActivity.activityName,
+        summary: `${adminSession?.email ?? 'Church admin'} moved ${movedActivity.activityName} ${direction} in the Sunday service order.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    }
   };
 
   const openActivityPlanner = (serviceDate: string, activity: ServiceActivity, message?: string) => {
@@ -1322,6 +2049,7 @@ function App() {
         return drafts;
       }, {}),
     );
+    setPlanningBaselineSignature(buildPlanningConflictSignature(scopedAssignments, serviceDate, requirements));
     setUpdateMessage(message ?? `Planning ${activity.activityName} for ${formatServiceDate(serviceDate)}. Drag the right people into the role slots, then confirm the plan.`);
   };
 
@@ -1402,6 +2130,12 @@ function App() {
       return;
     }
 
+    const livePlanningSignature = buildPlanningConflictSignature(scopedAssignments, planningForm.serviceDate, selectedPlanningRequirements);
+    if (planningBaselineSignature && livePlanningSignature !== planningBaselineSignature) {
+      setUpdateMessage('Another admin updated this Sunday plan while you were working. Reopen the activity to review the latest assignments before saving.');
+      return;
+    }
+
     const existingAssignments = scopedAssignments.filter((assignment) =>
       selectedPlanningActivities.some((activity) =>
         buildRequirementsForActivities([activity], selectedChurchRoleConfigs).some((requirement) =>
@@ -1462,11 +2196,24 @@ function App() {
         });
       }
 
+      const nextAssignments = [
+        ...scopedAssignments.filter((assignment) => !assignmentsToDelete.some((deletedAssignment) => deletedAssignment.id === assignment.id)),
+        ...createdAssignments,
+      ];
       setAssignments((current) => [
         ...current.filter((assignment) => !assignmentsToDelete.some((deletedAssignment) => deletedAssignment.id === assignment.id)),
         ...createdAssignments,
       ].sort((left, right) => left.serviceDate.localeCompare(right.serviceDate) || left.assignedTo.localeCompare(right.assignedTo)));
+      setPlanningBaselineSignature(buildPlanningConflictSignature(nextAssignments, planningForm.serviceDate, selectedPlanningRequirements));
       setUpdateMessage(`Confirmed ${selectedPlanningActivity.label} for ${formatServiceDate(planningForm.serviceDate)}.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'planning',
+        actionLabel: 'Confirmed Sunday plan',
+        targetLabel: selectedPlanningActivity.label,
+        summary: `${adminSession?.email ?? 'Church admin'} confirmed ${draftAssignments.length} role assignment${draftAssignments.length > 1 ? 's' : ''} for ${formatServiceDate(planningForm.serviceDate)}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to confirm the activity plan.');
     } finally {
@@ -1475,20 +2222,46 @@ function App() {
   };
 
   const handleDeleteAssignment = async (assignment: VolunteerAssignment) => {
+    const canDeleteAssignment =
+      adminProfile.roleKey === 'networkSuperAdmin'
+      || adminProfile.roleKey === 'churchAdmin'
+      || (adminProfile.roleKey === 'teamLeader' && adminProfile.teamNames.includes(assignment.teamName));
+    if (!canDeleteAssignment) {
+      setUpdateMessage('You can only remove assignments inside the teams you manage.');
+      return;
+    }
     try {
       if (isFirebaseConfigured) {
         await deleteVolunteerAssignment(assignment.id);
       }
       setAssignments((current) => current.filter((currentAssignment) => currentAssignment.id !== assignment.id));
       setUpdateMessage(`Removed ${assignment.roleName} for ${assignment.assignedTo} on ${formatServiceDate(assignment.serviceDate)}.`);
+      await appendAuditEntry({
+        churchId: assignment.churchId,
+        entityType: 'planning',
+        actionLabel: 'Removed assignment',
+        targetLabel: `${assignment.roleName} - ${assignment.assignedTo}`,
+        summary: `${adminSession?.email ?? 'Church admin'} removed the planned assignment from ${assignment.teamName}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to delete the assignment.');
     }
   };
 
   const handlePublishAnnouncement = async () => {
+    if (!canPublishUpdates) {
+      setUpdateMessage('Only super admins, church admins, and pastors can publish updates.');
+      return;
+    }
     if (!selectedChurch || !announcementForm.title.trim() || !announcementForm.body.trim()) {
       setUpdateMessage('Add both a title and body before publishing the announcement.');
+      return;
+    }
+
+    const visibleUntilAt = buildAnnouncementVisibleUntilAt(announcementForm.visibilityMode, announcementForm.visibleUntilDate);
+    if (announcementForm.visibilityMode === 'untilDate' && !visibleUntilAt) {
+      setUpdateMessage('Choose a valid end date for this announcement.');
       return;
     }
 
@@ -1500,6 +2273,7 @@ function App() {
           body: announcementForm.body,
           publishedBy: adminSession?.email ?? 'Church admin',
           isPublic: announcementForm.isPublic,
+          visibleUntilAt,
         });
       }
       setAnnouncements((current) => [
@@ -1509,34 +2283,111 @@ function App() {
           title: announcementForm.title.trim(),
           body: announcementForm.body.trim(),
           publishedAt: new Date().toISOString(),
+          visibleUntilAt,
           publishedBy: adminSession?.email ?? 'Church admin',
           isPublic: announcementForm.isPublic,
         },
         ...current,
       ]);
-      setAnnouncementForm({ title: '', body: '', isPublic: false });
+      setAnnouncementForm({
+        title: '',
+        body: '',
+        isPublic: false,
+        visibilityMode: '7days',
+        visibleUntilDate: toLocalDateInputValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+      });
       setUpdateMessage(`Published a church update for ${selectedChurch.displayCity}.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'church',
+        actionLabel: 'Published announcement',
+        targetLabel: announcementForm.title.trim(),
+        summary: `${adminSession?.email ?? 'Church admin'} published an announcement for ${selectedChurch.displayCity}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to publish the announcement.');
     }
   };
 
-  const handlePublishEvent = async () => {
-    if (!selectedChurch || !eventForm.title.trim() || !eventForm.startAt || !eventForm.endAt) {
-      setUpdateMessage('Add the event title, start time, and end time before publishing.');
+  const handleDeleteAnnouncement = async (announcement: ChurchAnnouncement) => {
+    if (!canPublishUpdates) {
+      setUpdateMessage('Only super admins, church admins, and pastors can delete announcements.');
       return;
     }
 
     try {
       if (isFirebaseConfigured) {
+        await deleteAnnouncement(announcement.id);
+      }
+
+      setAnnouncements((current) => current.filter((item) => item.id !== announcement.id));
+      setUpdateMessage(`Deleted the announcement "${announcement.title}".`);
+      await appendAuditEntry({
+        churchId: announcement.churchId,
+        entityType: 'church',
+        actionLabel: 'Deleted announcement',
+        targetLabel: announcement.title,
+        summary: `${adminSession?.email ?? 'Church admin'} deleted an announcement for ${selectedChurch?.displayCity ?? 'the selected church'}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to delete the announcement.');
+    }
+  };
+
+  const handleEventPosterUpload = async (file: File | null) => {
+    if (!file) {
+      setEventForm((current) => ({ ...current, posterUrl: '', posterFileName: '' }));
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setUpdateMessage('Choose an image file for the event poster.');
+      return;
+    }
+
+    try {
+      const posterUrl = await readPosterFileAsDataUrl(file);
+      setEventForm((current) => ({
+        ...current,
+        posterUrl,
+        posterFileName: file.name,
+      }));
+      setUpdateMessage(`Poster ready: ${file.name}`);
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to load the selected poster.');
+    }
+  };
+
+  const handlePublishEvent = async () => {
+    if (!canPublishEvents) {
+      setUpdateMessage('Only super admins and church admins can publish events.');
+      return;
+    }
+    if (!selectedChurch || !eventForm.title.trim() || !eventForm.startAt || !eventForm.endAt) {
+      setUpdateMessage('Add the event title, start time, and end time before publishing.');
+      return;
+    }
+
+    const scopeType = eventForm.scopeType;
+    const eventChurchId = scopeType === 'network' ? 'network' : selectedChurch.id;
+    const scopeLabel = scopeType === 'network' ? 'All churches' : selectedChurch.displayCity;
+    const location = eventForm.location || selectedChurch.address;
+
+    try {
+      if (isFirebaseConfigured) {
         await publishEvent({
-          churchId: selectedChurch.id,
+          churchId: eventChurchId,
+          scopeType,
+          scopeLabel,
           title: eventForm.title,
           description: eventForm.description,
-          location: eventForm.location || selectedChurch.address,
+          location,
           startAt: eventForm.startAt,
           endAt: eventForm.endAt,
           createdBy: adminSession?.email ?? 'Church admin',
+          posterUrl: eventForm.posterUrl,
           isPublic: eventForm.isPublic,
         });
       }
@@ -1544,27 +2395,189 @@ function App() {
         ...current,
         {
           id: createId('event'),
-          churchId: selectedChurch.id,
+          churchId: eventChurchId,
+          scopeType,
+          scopeLabel,
           title: eventForm.title.trim(),
           description: eventForm.description.trim(),
-          location: eventForm.location || selectedChurch.address,
+          location,
           startAt: eventForm.startAt,
           endAt: eventForm.endAt,
           createdBy: adminSession?.email ?? 'Church admin',
+          posterUrl: eventForm.posterUrl || undefined,
           isPublic: eventForm.isPublic,
         },
       ].sort((left, right) => left.startAt.localeCompare(right.startAt)));
       setEventForm({
+        scopeType: 'church',
         title: '',
         description: '',
         location: selectedChurch.address,
         startAt: '',
         endAt: '',
-        isPublic: true,
+        posterUrl: '',
+        posterFileName: '',
+        isPublic: false,
       });
-      setUpdateMessage(`Published an event for ${selectedChurch.displayCity}.`);
+      setUpdateMessage(scopeType === 'network'
+        ? 'Published a common event across all churches.'
+        : `Published an event for ${selectedChurch.displayCity}.`);
+      await appendAuditEntry({
+        churchId: eventChurchId,
+        entityType: 'church',
+        actionLabel: 'Published event',
+        targetLabel: eventForm.title.trim(),
+        summary: scopeType === 'network'
+          ? `${adminSession?.email ?? 'Church admin'} published a common event across all churches.`
+          : `${adminSession?.email ?? 'Church admin'} published a new event for ${selectedChurch.displayCity}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to publish the event.');
+    }
+  };
+
+  const handleDeleteEvent = async (event: ChurchEventItem) => {
+    if (!canPublishEvents) {
+      setUpdateMessage('Only super admins, church admins, and pastors can delete events.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await deleteEvent(event.id);
+      }
+
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+      setUpdateMessage(`Deleted the event "${event.title}".`);
+      await appendAuditEntry({
+        churchId: event.churchId,
+        entityType: 'church',
+        actionLabel: 'Deleted event',
+        targetLabel: event.title,
+        summary: `${adminSession?.email ?? 'Church admin'} deleted ${event.scopeType === 'network' ? 'a common event' : 'a church-specific event'} for ${selectedChurch?.displayCity ?? 'the selected church'}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to delete the event.');
+    }
+  };
+
+  const handleCancelCommonMeeting = async (meeting: CommonMeetingOccurrence) => {
+    if (!selectedChurch || !canManageCommonMeetings) {
+      setUpdateMessage('Only super admins and church admins can cancel common meetings.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await cancelCommonMeetingOccurrence({
+          churchId: selectedChurch.id,
+          meetingKey: meeting.key,
+          occurrenceDate: meeting.occurrenceDate,
+          title: meeting.title,
+        });
+      }
+      setCommonMeetingCancellationKeys((current) =>
+        current.includes(`${meeting.key}:${meeting.occurrenceDate}`)
+          ? current
+          : [...current, `${meeting.key}:${meeting.occurrenceDate}`],
+      );
+      setUpdateMessage(`${meeting.title} on ${formatServiceDate(meeting.occurrenceDate)} has been cancelled for ${selectedChurch.displayCity}.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'church',
+        actionLabel: 'Cancelled common meeting',
+        targetLabel: meeting.title,
+        summary: `${adminSession?.email ?? 'Church admin'} cancelled ${meeting.title} for ${formatServiceDate(meeting.occurrenceDate)}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to cancel the common meeting.');
+    }
+  };
+
+  const handleRestoreCommonMeeting = async (meeting: CommonMeetingOccurrence) => {
+    if (!selectedChurch || !canManageCommonMeetings) {
+      setUpdateMessage('Only super admins and church admins can restore common meetings.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await restoreCommonMeetingOccurrence(selectedChurch.id, meeting.key, meeting.occurrenceDate);
+      }
+      setCommonMeetingCancellationKeys((current) => current.filter((item) => item !== `${meeting.key}:${meeting.occurrenceDate}`));
+      setUpdateMessage(`${meeting.title} on ${formatServiceDate(meeting.occurrenceDate)} has been restored for ${selectedChurch.displayCity}.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'church',
+        actionLabel: 'Restored common meeting',
+        targetLabel: meeting.title,
+        summary: `${adminSession?.email ?? 'Church admin'} restored ${meeting.title} for ${formatServiceDate(meeting.occurrenceDate)}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to restore the common meeting.');
+    }
+  };
+
+  const handleCancelChurchSpecificMeeting = async (meeting: ChurchSpecificMeetingOccurrence) => {
+    if (!selectedChurch || !canManageCommonMeetings) {
+      setUpdateMessage('Only super admins and church admins can cancel church-specific meetings.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await cancelChurchSpecificMeetingOccurrence({
+          churchId: selectedChurch.id,
+          meetingKey: meeting.key,
+          occurrenceDate: meeting.occurrenceDate,
+          title: meeting.title,
+        });
+      }
+      setChurchSpecificMeetingCancellationKeys((current) =>
+        current.includes(`${meeting.key}:${meeting.occurrenceDate}`)
+          ? current
+          : [...current, `${meeting.key}:${meeting.occurrenceDate}`],
+      );
+      setUpdateMessage(`${meeting.title} on ${formatServiceDate(meeting.occurrenceDate)} has been cancelled for ${selectedChurch.displayCity}.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'church',
+        actionLabel: 'Cancelled church meeting',
+        targetLabel: meeting.title,
+        summary: `${adminSession?.email ?? 'Church admin'} cancelled ${meeting.title} for ${formatServiceDate(meeting.occurrenceDate)}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to cancel the church-specific meeting.');
+    }
+  };
+
+  const handleRestoreChurchSpecificMeeting = async (meeting: ChurchSpecificMeetingOccurrence) => {
+    if (!selectedChurch || !canManageCommonMeetings) {
+      setUpdateMessage('Only super admins and church admins can restore church-specific meetings.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await restoreChurchSpecificMeetingOccurrence(selectedChurch.id, meeting.key, meeting.occurrenceDate);
+      }
+      setChurchSpecificMeetingCancellationKeys((current) => current.filter((item) => item !== `${meeting.key}:${meeting.occurrenceDate}`));
+      setUpdateMessage(`${meeting.title} on ${formatServiceDate(meeting.occurrenceDate)} has been restored for ${selectedChurch.displayCity}.`);
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'church',
+        actionLabel: 'Restored church meeting',
+        targetLabel: meeting.title,
+        summary: `${adminSession?.email ?? 'Church admin'} restored ${meeting.title} for ${formatServiceDate(meeting.occurrenceDate)}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to restore the church-specific meeting.');
     }
   };
 
@@ -1592,28 +2605,82 @@ function App() {
         serviceTimes: '',
         sharedDrivePath: '',
         googleMapsLabel: '',
+        contactEmail: '',
+        contactPhone: '',
         instagramUrl: '',
         facebookUrl: '',
       });
       setUpdateMessage(`Added ${newChurch.displayCity} and the default teams were created for that church.`);
+      await appendAuditEntry({
+        churchId: newChurch.id,
+        entityType: 'church',
+        actionLabel: 'Created church',
+        targetLabel: newChurch.displayCity,
+        summary: `${adminSession?.email ?? 'Church admin'} created a new church location with the default ministry teams.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to add the church location.');
     }
   };
 
-  const handleExportArchive = () => {
-    if (!selectedChurch || archivedPlans.length === 0 || typeof window === 'undefined' || !canExportArchive) {
+  const handleSaveChurchEdit = async (church: Church) => {
+    if (!canEditChurch) {
+      setUpdateMessage('Only super admins and church admins can edit church details.');
       return;
     }
 
-    const exportWorkbook = formatArchiveExportWorkbookXml(selectedChurch.displayCity, archivedPlans);
+    const draft = churchEditDrafts[church.id];
+    if (!draft) {
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await updateChurchLocation({
+          churchId: church.id,
+          ...draft,
+        });
+      }
+
+      setChurches((current) => current.map((item) => item.id === church.id ? { ...item, ...draft } : item));
+      setChurchEditId(null);
+      setUpdateMessage(`Updated ${draft.displayCity || church.displayCity} church details.`);
+      await appendAuditEntry({
+        churchId: church.id,
+        entityType: 'church',
+        actionLabel: 'Updated church',
+        targetLabel: draft.displayCity || church.displayCity,
+        summary: `${adminSession?.email ?? 'Church admin'} updated church details, support contacts, and social links.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to update the church details.');
+    }
+  };
+
+  const handleExportArchive = (plansOverride?: ArchivedServicePlan[]) => {
+    const plansToExport = plansOverride ?? archivedPlans;
+    if (!selectedChurch || plansToExport.length === 0 || typeof window === 'undefined' || !canExportArchive) {
+      return;
+    }
+
+    const exportWorkbook = formatArchiveExportWorkbookXml(selectedChurch.displayCity, plansToExport);
     const blob = new Blob([exportWorkbook], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${selectedChurch.id}-service-plan-archive.xls`;
+    anchor.download = plansOverride ? `${selectedChurch.id}-${plansToExport[0]?.serviceDate ?? 'loaded'}-service-plan.xls` : `${selectedChurch.id}-service-plan-archive.xls`;
     anchor.click();
     window.URL.revokeObjectURL(url);
+    void appendAuditEntry({
+      churchId: selectedChurch.id,
+      entityType: 'archive',
+      actionLabel: plansOverride ? 'Exported loaded Sunday' : 'Exported archive',
+      targetLabel: plansOverride ? formatServiceDate(plansToExport[0]?.serviceDate ?? '') : `${selectedChurch.displayCity} archive`,
+      summary: `${adminSession?.email ?? 'Church admin'} exported ${plansOverride ? 'the loaded Sunday workbook' : 'the archived Sunday workbook'}.`,
+      actor: adminSession?.email ?? 'Church admin',
+    });
   };
 
   const loadArchiveIntoViewer = (serviceDate: string, showMessage: boolean) => {
@@ -1640,6 +2707,14 @@ function App() {
     if (showMessage) {
       setUpdateMessage(`Loaded archive for ${formatServiceDate(serviceDate)}.`);
     }
+    void appendAuditEntry({
+      churchId: selectedChurch?.id ?? '',
+      entityType: 'archive',
+      actionLabel: 'Loaded archive',
+      targetLabel: formatServiceDate(serviceDate),
+      summary: `${adminSession?.email ?? 'Church admin'} opened an archived Sunday service plan for review.`,
+      actor: adminSession?.email ?? 'Church admin',
+    });
 
     if (typeof window !== 'undefined') {
       window.setTimeout(() => {
@@ -1674,30 +2749,14 @@ function App() {
               {isAuthenticating ? 'Connecting...' : isFirebaseConfigured ? 'Continue With Google' : 'Open Demo Dashboard'}
             </button>
           </div>
-          {isFirebaseConfigured ? (
-            <>
-              <p className="auth-divider">or continue with email</p>
-              <div className="auth-form">
-                <label className="auth-label" htmlFor="admin-email">Email</label>
-                <input id="admin-email" className="auth-input" type="email" value={emailAuthForm.email} onChange={(event) => setEmailAuthForm((current) => ({ ...current, email: event.target.value }))} placeholder="bethelchurchnuremberg@gmail.com" />
-                <label className="auth-label" htmlFor="admin-password">Password</label>
-                <input id="admin-password" className="auth-input" type="password" value={emailAuthForm.password} onChange={(event) => setEmailAuthForm((current) => ({ ...current, password: event.target.value }))} placeholder="Password" />
-                <button type="button" className="action-button approve" onClick={() => void handleSignInWithEmail()} disabled={isAuthenticating}>
-                  {isAuthenticating ? 'Connecting...' : 'Continue With Email'}
-                </button>
-              </div>
-            </>
-          ) : null}
           <p className="auth-hint">
-            {isFirebaseConfigured ? 'Use a church admin, super admin, or team leader account to access the dashboard.' : 'Firebase keys are missing, so the demo dashboard opens with the local prototype data.'}
+            {isFirebaseConfigured ? 'Use a Google account that already has a church admin, super admin, pastor, or team leader role to access the dashboard.' : 'Firebase keys are missing, so the demo dashboard opens with the local prototype data.'}
           </p>
           {authError ? <p className="auth-error">{authError}</p> : null}
         </div>
       </div>
     );
   }
-
-  const sundayAssignments = scopedAssignments.filter((assignment) => assignment.serviceDate === selectedPlanningSunday);
 
   return (
     <div className="admin-shell">
@@ -1802,12 +2861,12 @@ function App() {
             <article className="metric-card">
               <p className="panel-kicker">Pending approvals</p>
               <strong>{scopedRequests.filter((request) => request.status === 'pending').length}</strong>
-              <span>People waiting for onboarding review in the selected church.</span>
+              <span>People still waiting for an onboarding decision in this church.</span>
             </article>
             <article className="metric-card">
-              <p className="panel-kicker">Pending prayers</p>
-              <strong>{scopedPrayerRequests.filter((request) => request.status === 'pending').length}</strong>
-              <span>Prayer requests currently waiting for moderation.</span>
+              <p className="panel-kicker">Sunday coverage</p>
+              <strong>{sundayCoveragePercent}%</strong>
+              <span>{totalSundayRequirements - uncoveredRequirementsCount} of {totalSundayRequirements} Sunday roles are currently covered.</span>
             </article>
             <article className="metric-card">
               <p className="panel-kicker">Members tracked</p>
@@ -1815,19 +2874,21 @@ function App() {
               <span>Managed members currently visible in this church scope.</span>
             </article>
             <article className="metric-card">
-              <p className="panel-kicker">Assignments</p>
-              <strong>{sundayAssignments.length}</strong>
-              <span>Planned assignments for the active planning Sunday.</span>
+              <p className="panel-kicker">Waiting for response</p>
+              <strong>{pendingSundayResponses}</strong>
+              <span>Assignments on the active Sunday that still need a member response.</span>
             </article>
             <article className="metric-card">
-              <p className="panel-kicker">Announcements</p>
-              <strong>{scopedAnnouncements.length}</strong>
-              <span>Published church updates prepared for the selected church.</span>
+              <p className="panel-kicker">Next event</p>
+              <strong>{nextEvent ? nextEvent.title : 'None'}</strong>
+              <span>{nextEvent ? formatDateTimeRange(nextEvent.startAt, nextEvent.endAt) : 'No upcoming church event or meeting is scheduled yet.'}</span>
             </article>
-            <article className="metric-card">
-              <p className="panel-kicker">Upcoming events</p>
-              <strong>{scopedEvents.length}</strong>
-              <span>Local events and service-related moments coming up next.</span>
+            <article className="detail-card">
+              <p className="panel-kicker">Useful insights</p>
+              <h3>What needs attention next</h3>
+              <div className="detail-block"><strong>Approval queue</strong><span>{scopedRequests.filter((request) => request.status === 'pending').length > 0 ? 'Review new access requests soon.' : 'No one is waiting in the onboarding queue.'}</span></div>
+              <div className="detail-block"><strong>Sunday readiness</strong><span>{uncoveredRequirementsCount > 0 ? `${uncoveredRequirementsCount} Sunday role${uncoveredRequirementsCount > 1 ? 's are' : ' is'} still unfilled.` : 'All planned Sunday roles currently have someone assigned.'}</span></div>
+              <div className="detail-block"><strong>Member follow-up</strong><span>{scopedMembers.filter((member) => member.teamNames.length === 0).length > 0 ? `${scopedMembers.filter((member) => member.teamNames.length === 0).length} member${scopedMembers.filter((member) => member.teamNames.length === 0).length > 1 ? 's have' : ' has'} not been assigned to a team yet.` : 'Managed members are assigned and ready for Sunday planning.'}</span></div>
             </article>
             <article className="wide-card">
               <div className="section-heading">
@@ -1861,6 +2922,20 @@ function App() {
                 {sundayAssignments.length === 0 ? <div className="empty-card">No assignments are planned yet for the active Sunday.</div> : null}
               </div>
             </article>
+            <article className="wide-card">
+              <p className="panel-kicker">Recent activity</p>
+              <h3>Latest admin changes</h3>
+              <div className="update-list event-instance-list">
+                {auditEntries.slice(0, 4).map((entry) => (
+                  <div key={entry.id} className="update-card compact-update-card">
+                    <strong>{entry.actionLabel}</strong>
+                    <p className="detail-copy">{entry.targetLabel}</p>
+                    <p className="muted-line">{entry.summary}</p>
+                  </div>
+                ))}
+                {auditEntries.length === 0 ? <div className="empty-card">Admin actions like approvals, church edits, and Sunday plan changes will appear here.</div> : null}
+              </div>
+            </article>
           </section>
         ) : null}
 
@@ -1872,11 +2947,48 @@ function App() {
                   <p className="panel-kicker">Approval queue</p>
                   <h3>Requests for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
                 </div>
+                <div className="chip-row">
+                  <span className="mini-chip">Showing {filteredRequests.length}</span>
+                  {selectedRequestIds.length > 0 ? <span className="mini-chip">Selected {selectedRequestIds.length}</span> : null}
+                </div>
+              </div>
+              <div className="filter-cluster approvals-toolbar">
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="approval-search">Search requests</label>
+                  <input id="approval-search" className="auth-input" type="text" value={approvalSearch} onChange={(event) => setApprovalSearch(event.target.value)} placeholder="Search by name, email, or note" />
+                </div>
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="approval-status">Status</label>
+                  <select id="approval-status" className="auth-input" value={approvalStatusFilter} onChange={(event) => setApprovalStatusFilter(event.target.value as 'all' | AccessRequest['status'])}>
+                    <option value="all">All statuses</option>
+                    <option value="pending">Pending only</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="approval-role">Requested role</label>
+                  <select id="approval-role" className="auth-input" value={approvalRoleFilter} onChange={(event) => setApprovalRoleFilter(event.target.value as 'all' | RoleKey)}>
+                    <option value="all">All roles</option>
+                    {(['member', 'volunteer', 'teamLeader', 'pastor', 'churchAdmin'] as RoleKey[]).map((role) => (
+                      <option key={role} value={role}>{roleLabels[role]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="approvals-bulk-actions">
+                  <button type="button" className="action-button approve compact-action" onClick={() => void handleApproveRequest('approved', filteredRequests.filter((request) => selectedRequestIds.includes(request.id) && request.status === 'pending'))} disabled={!canReviewApprovals || selectedRequestIds.length === 0}>Bulk approve</button>
+                  <button type="button" className="action-button reject compact-action" onClick={() => void handleApproveRequest('rejected', filteredRequests.filter((request) => selectedRequestIds.includes(request.id) && request.status === 'pending'))} disabled={!canReviewApprovals || selectedRequestIds.length === 0}>Bulk reject</button>
+                  <button type="button" className="member-cancel-button compact-action" onClick={() => setSelectedRequestIds(filteredRequests.map((request) => request.id))} disabled={filteredRequests.length === 0}>Select visible</button>
+                  <button type="button" className="member-cancel-button compact-action" onClick={() => setSelectedRequestIds([])} disabled={selectedRequestIds.length === 0}>Clear</button>
+                </div>
               </div>
               <div className="request-list">
-                {scopedRequests.map((request) => (
+                {filteredRequests.map((request) => (
                   <button key={request.id} type="button" className={`request-card ${request.id === selectedRequest?.id ? 'selected' : ''}`} onClick={() => setSelectedRequestId(request.id)}>
                     <div className="request-top">
+                      <label className="request-select-box" onClick={(event) => event.stopPropagation()}>
+                        <input type="checkbox" checked={selectedRequestIds.includes(request.id)} onChange={() => toggleRequestSelection(request.id)} />
+                      </label>
                       <div>
                         <p className="panel-kicker">{request.id}</p>
                         <h3>{request.fullName}</h3>
@@ -1885,9 +2997,12 @@ function App() {
                     </div>
                     <p>{request.note}</p>
                     <p className="muted-line">{request.email} | {request.requestedAt}</p>
+                    <div className="chip-row">
+                      {request.requestedRoles.map((role) => <span key={role} className="mini-chip">{roleLabels[role]}</span>)}
+                    </div>
                   </button>
                 ))}
-                {scopedRequests.length === 0 ? <div className="empty-card">No approval requests are waiting for this church.</div> : null}
+                {filteredRequests.length === 0 ? <div className="empty-card">No approval requests match the current filters for this church.</div> : null}
               </div>
             </article>
             <article className="detail-card">
@@ -1896,23 +3011,54 @@ function App() {
               {selectedRequest ? (
                 <>
                   <div className="detail-block"><strong>Email</strong><span>{selectedRequest.email}</span></div>
+                  <div className="detail-block"><strong>Phone</strong><span>{selectedRequest.phoneNumber || 'No phone number provided yet'}</span></div>
                   <div className="detail-block">
                     <strong>Requested roles</strong>
                     <div className="chip-row">{selectedRequest.requestedRoles.map((role) => <span key={role} className="mini-chip">{roleLabels[role]}</span>)}</div>
                   </div>
                   <div className="detail-block"><strong>Request note</strong><span>{selectedRequest.note}</span></div>
                   <div className="action-stack horizontal">
-                    <button type="button" className="action-button approve" onClick={() => void handleApproveRequest('approved')}>Approve</button>
-                    <button type="button" className="action-button reject" onClick={() => void handleApproveRequest('rejected')}>Reject</button>
+                    <button type="button" className="action-button approve" onClick={() => void handleApproveRequest('approved')} disabled={!canReviewApprovals || selectedRequest.status !== 'pending'}>Approve</button>
+                    <button type="button" className="action-button reject" onClick={() => void handleApproveRequest('rejected')} disabled={!canReviewApprovals || selectedRequest.status !== 'pending'}>Reject</button>
                   </div>
                 </>
               ) : <div className="empty-card">Choose a request to view details.</div>}
+            </article>
+            <article className="wide-card">
+              <div className="section-heading">
+                <div>
+                  <p className="panel-kicker">Prayer moderation</p>
+                  <h3>Prayer requests for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
+                </div>
+              </div>
+              {!canModeratePrayer ? <div className="notice-banner inline-banner">Only super admins and church admins can approve, hide, or remove prayer requests.</div> : null}
+              <div className="prayer-moderation-grid">
+                {scopedPrayerRequests.map((request) => (
+                  <article key={request.id} className="request-card selected">
+                    <div className="request-top">
+                      <div>
+                        <p className="panel-kicker">Submitted {request.createdAt}</p>
+                        <h3>{selectedChurch?.displayCity}</h3>
+                      </div>
+                      <span className={`status-badge ${request.status}`}>{request.status}</span>
+                    </div>
+                    <p>{request.preview}</p>
+                    <div className="action-stack horizontal">
+                      <button type="button" className="action-button approve" onClick={() => void handleModeratePrayer(request.id, 'approved')} disabled={!canModeratePrayer}>Approve</button>
+                      <button type="button" className="action-button reject" onClick={() => void handleModeratePrayer(request.id, 'hidden')} disabled={!canModeratePrayer}>Hide</button>
+                      <button type="button" className="action-button reject compact-action prayer-remove-button" onClick={() => void handleRemovePrayerRequest(request.id)} disabled={!canModeratePrayer}>Remove</button>
+                    </div>
+                  </article>
+                ))}
+                {scopedPrayerRequests.length === 0 ? <div className="empty-card">No prayer requests are waiting for this church.</div> : null}
+              </div>
             </article>
           </section>
         ) : null}
 
         {activeView === 'members' ? (
           <section className="dashboard-grid members-layout">
+            {canManageMembers ? (
             <article className="wide-card members-create-card">
               <p className="panel-kicker">Create a managed member profile</p>
               <h3>Add a church member directly</h3>
@@ -1956,15 +3102,59 @@ function App() {
                 <button type="button" className="action-button publish member-save-button" onClick={() => void handleCreateManagedMember()}>Add member</button>
               </div>
             </article>
+            ) : null}
             <article className="wide-card">
               <div className="section-heading">
                 <div>
                   <p className="panel-kicker">Members</p>
                   <h3>{selectedChurch?.displayCity ?? 'Selected church'} members</h3>
                 </div>
+                <div className="chip-row">
+                  <span className="mini-chip">Showing {visibleMemberRecords.length}</span>
+                  <span className="mini-chip">Total {scopedMembers.length}</span>
+                </div>
+              </div>
+              <div className="filter-cluster member-filters">
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="member-search">Search members</label>
+                  <input id="member-search" className="auth-input" type="text" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="Search name, email, or team" />
+                </div>
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="member-role-filter">Role</label>
+                  <select id="member-role-filter" className="auth-input" value={memberRoleFilter} onChange={(event) => setMemberRoleFilter(event.target.value as 'all' | RoleKey)}>
+                    <option value="all">All roles</option>
+                    {(['member', 'volunteer', 'teamLeader', 'pastor', 'churchAdmin'] as RoleKey[]).map((role) => (
+                      <option key={role} value={role}>{roleLabels[role]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="member-team-filter">Team</label>
+                  <select id="member-team-filter" className="auth-input" value={memberTeamFilter} onChange={(event) => setMemberTeamFilter(event.target.value as 'all' | string)}>
+                    <option value="all">All teams</option>
+                    {orderedSelectedChurchTeams.map((teamName) => <option key={teamName} value={teamName}>{teamName}</option>)}
+                  </select>
+                </div>
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="member-status-filter">Status</label>
+                  <select id="member-status-filter" className="auth-input" value={memberStatusFilter} onChange={(event) => setMemberStatusFilter(event.target.value as typeof memberStatusFilter)}>
+                    <option value="all">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="unassigned-team">No team assigned</option>
+                  </select>
+                </div>
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="member-sort-key">Sort by</label>
+                  <select id="member-sort-key" className="auth-input" value={memberSortKey} onChange={(event) => setMemberSortKey(event.target.value as typeof memberSortKey)}>
+                    <option value="name">Name</option>
+                    <option value="role">Role</option>
+                    <option value="team">Team</option>
+                    <option value="status">Status</option>
+                  </select>
+                </div>
               </div>
               <div className="member-grid">
-                {scopedMembers.map((member) => {
+                {visibleMemberRecords.map((member) => {
                   const memberDraft = memberEditDrafts[member.id] ?? { roleKey: member.roleKey, teamNames: member.teamNames };
                   const isEditing = memberEditId === member.id;
                   return (
@@ -1973,8 +3163,11 @@ function App() {
                         <div>
                           <h3>{member.fullName}</h3>
                           <p className="member-email">{member.email}</p>
+                          <div className="chip-row member-status-row">
+                            <span className="mini-chip">{getMemberStatusLabel(member)}</span>
+                          </div>
                         </div>
-                        <button type="button" className="member-edit-button" onClick={() => handleStartMemberEdit(member)}>Edit</button>
+                        {canManageMembers ? <button type="button" className="member-edit-button" onClick={() => handleStartMemberEdit(member)}>Edit</button> : null}
                       </div>
                       <div className="member-meta-list">
                         <div className="member-meta-item">
@@ -2201,7 +3394,7 @@ function App() {
                   <label className="auth-label" htmlFor="planning-activity-key">Activity</label>
                   <select id="planning-activity-key" className="auth-input" value={planningForm.activityKey} onChange={(event) => setPlanningForm((current) => ({ ...current, activityKey: event.target.value }))}>
                     <option value="">Choose Sunday activity</option>
-                    {planningActivityOptions.map((activity) => <option key={activity.key} value={activity.key}>{activity.label}</option>)}
+                    {visiblePlanningActivityOptions.map((activity) => <option key={activity.key} value={activity.key}>{activity.label}</option>)}
                   </select>
                 </div>
                 <div className="planning-activity-action">
@@ -2215,17 +3408,12 @@ function App() {
                         setUpdateMessage('Choose both the Sunday and activity before opening the planner.');
                         return;
                       }
-                      setOpenedPlanningKey(`${planningForm.serviceDate}:${activity.key}`);
-                      const activitiesToPlan = selectedChurchServiceOrder.filter((entry) => activity.activityIds.includes(entry.id));
-                      const requirements = buildRequirementsForActivities(activitiesToPlan, selectedChurchRoleConfigs);
-                      setPlanningDraftAssignments(
-                        requirements.reduce<Record<string, PlanningDraftItem[]>>((drafts, requirement) => {
-                          const existingAssignment = getAssignmentsForRequirement(scopedAssignments, planningForm.serviceDate, requirement)[0];
-                          drafts[requirement.id] = existingAssignment ? [{ assignedTo: existingAssignment.assignedTo, assignedUserId: existingAssignment.assignedUserId }] : [];
-                          return drafts;
-                        }, {}),
-                      );
-                      setUpdateMessage(`Planning ${activity.label} for ${formatServiceDate(planningForm.serviceDate)}.`);
+                      const anchorActivity = selectedChurchServiceOrder.find((entry) => activity.activityIds.includes(entry.id));
+                      if (!anchorActivity) {
+                        setUpdateMessage('Choose a valid Sunday activity before opening the planner.');
+                        return;
+                      }
+                      openActivityPlanner(planningForm.serviceDate, anchorActivity, `Planning ${activity.label} for ${formatServiceDate(planningForm.serviceDate)}.`);
                     }}
                   >
                     Plan
@@ -2238,6 +3426,9 @@ function App() {
                     <div><h4>{selectedPlanningActivity.label}</h4><p>{formatServiceDate(planningForm.serviceDate)} | {selectedPlanningActivity.teamName}</p></div>
                     <button type="button" className={`member-edit-button planning-other-member-toggle ${planningForm.allowOtherMembers ? 'active' : ''}`} onClick={() => setPlanningForm((current) => ({ ...current, allowOtherMembers: !current.allowOtherMembers }))}>Other member</button>
                   </div>
+                  {planningBaselineSignature ? (
+                    <div className="notice-banner inline-banner">This planner locks onto the latest saved version for this Sunday. If another admin changes the same activity while you are working, you will be asked to reopen it before saving.</div>
+                  ) : null}
                   <div className="planning-workbench-grid">
                     <div className="planning-workbench-panel">
                       <h4>Eligible members</h4>
@@ -2310,6 +3501,22 @@ function App() {
                       <span className={`response-tag ${assignment.responseStatus}`}>{assignment.responseStatus}</span>
                     </div>
                     <div className="planning-assignment-actions">
+                      <button
+                        type="button"
+                        className="member-edit-button"
+                        onClick={() => {
+                          const matchingActivity = selectedChurchServiceOrder.find((activity) =>
+                            buildRequirementsForActivities([activity], selectedChurchRoleConfigs).some((requirement) =>
+                              requirement.teamName === assignment.teamName && requirement.roleName === assignment.roleName,
+                            ),
+                          );
+                          if (matchingActivity) {
+                            openActivityPlanner(assignment.serviceDate, matchingActivity, `Reassign ${assignment.roleName} for ${formatServiceDate(assignment.serviceDate)}.`);
+                          }
+                        }}
+                      >
+                        Reassign
+                      </button>
                       <button type="button" className="planning-assignment-delete" onClick={() => void handleDeleteAssignment(assignment)}>Delete assignment</button>
                     </div>
                   </div>
@@ -2341,10 +3548,18 @@ function App() {
                     {archivedPlans.map((plan) => <option key={plan.serviceDate} value={plan.serviceDate}>{formatServiceDate(plan.serviceDate)}</option>)}
                   </select>
                 </div>
+                <div className="filter-panel">
+                  <label className="auth-label" htmlFor="archive-compare-sunday">Compare with another Sunday</label>
+                  <select id="archive-compare-sunday" className="auth-input" value={compareArchiveSunday} onChange={(event) => setCompareArchiveSunday(event.target.value)} disabled={archivedPlans.length < 2}>
+                    <option value="">{archivedPlans.length < 2 ? 'Need at least two archived Sundays' : 'Choose comparison Sunday'}</option>
+                    {archivedPlans.filter((plan) => plan.serviceDate !== selectedArchiveSunday).map((plan) => <option key={plan.serviceDate} value={plan.serviceDate}>{formatServiceDate(plan.serviceDate)}</option>)}
+                  </select>
+                </div>
                 <div className="chip-row">
                   <span className="mini-chip">Saved file entries: {archivedPlans.length}</span>
                   <button type="button" className="action-button approve" onClick={() => handleLoadArchive()} disabled={!selectedArchiveSunday}>Load archive</button>
                   {canExportArchive ? <button type="button" className="action-button publish" onClick={() => handleExportArchive()} disabled={archivedPlans.length === 0}>Export archive file</button> : null}
+                  {canExportArchive ? <button type="button" className="member-edit-button" onClick={() => loadedArchivePlan ? handleExportArchive([loadedArchivePlan]) : undefined} disabled={!loadedArchivePlan}>Export loaded Sunday</button> : null}
                 </div>
               </div>
               {selectedArchiveSunday && (!loadedArchivePlan || loadedArchivePlan.serviceDate !== selectedArchiveSunday) ? (
@@ -2360,6 +3575,15 @@ function App() {
                     </div>
                     <span className="archive-loaded-badge">Loaded archive</span>
                   </div>
+                  {archiveComparisonPlan ? (
+                    <div className="detail-card archive-compare-card">
+                      <p className="panel-kicker">Service history comparison</p>
+                      <h3>{formatServiceDate(loadedArchivePlan.serviceDate)} compared with {formatServiceDate(archiveComparisonPlan.serviceDate)}</h3>
+                      <div className="detail-block"><strong>Loaded Sunday assignments</strong><span>{countArchivedAssignments(loadedArchivePlan)}</span></div>
+                      <div className="detail-block"><strong>Comparison Sunday assignments</strong><span>{countArchivedAssignments(archiveComparisonPlan)}</span></div>
+                      <div className="detail-block"><strong>Difference</strong><span>{countArchivedAssignments(loadedArchivePlan) - countArchivedAssignments(archiveComparisonPlan)} assignment delta across the saved plan.</span></div>
+                    </div>
+                  ) : null}
                   <div className="planning-sunday-card">
                     <div className="planning-sunday-header">
                       <div>
@@ -2431,56 +3655,274 @@ function App() {
 
         {activeView === 'updates' ? (
           <section className="dashboard-grid updates-layout">
-            <article className="composer-card updates-card">
+            <article className="composer-card updates-card event-management-card">
               <p className="panel-kicker">Announcements</p>
               <h3>Announcements for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
               <div className="form-grid">
                 <input className="auth-input" type="text" value={announcementForm.title} onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))} placeholder="Announcement title" />
                 <textarea className="auth-input content-area" value={announcementForm.body} onChange={(event) => setAnnouncementForm((current) => ({ ...current, body: event.target.value }))} placeholder="Announcement body" />
-                <button type="button" className="action-button publish" onClick={() => void handlePublishAnnouncement()}>Publish announcement</button>
+                <select className="auth-input" value={announcementForm.visibilityMode} onChange={(event) => setAnnouncementForm((current) => ({ ...current, visibilityMode: event.target.value as AnnouncementVisibilityMode }))}>
+                  <option value="7days">Show for 7 days</option>
+                  <option value="14days">Show for 14 days</option>
+                  <option value="30days">Show for 30 days</option>
+                  <option value="untilDate">Show until a selected date</option>
+                </select>
+                <input
+                  className="auth-input"
+                  type="date"
+                  value={announcementForm.visibleUntilDate}
+                  onChange={(event) => setAnnouncementForm((current) => ({ ...current, visibleUntilDate: event.target.value }))}
+                  disabled={announcementForm.visibilityMode !== 'untilDate'}
+                />
+                <button type="button" className="action-button publish" onClick={() => void handlePublishAnnouncement()} disabled={!canPublishUpdates}>Publish announcement</button>
               </div>
-              <div className="update-list">
-                {scopedAnnouncements.map((announcement) => (
-                  <div key={announcement.id} className="update-card">
-                    <strong>{announcement.title}</strong>
+              <div className="update-list event-instance-list">
+                {activeScopedAnnouncements.map((announcement) => (
+                  <div key={announcement.id} className="update-card announcement-update-card">
+                    <div className="announcement-update-card-top">
+                      <strong>{announcement.title}</strong>
+                      <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleDeleteAnnouncement(announcement)} disabled={!canPublishUpdates}>Delete</button>
+                    </div>
                     <p className="detail-copy">{announcement.body}</p>
+                    <p className="detail-copy">{formatAnnouncementVisibleUntil(announcement.visibleUntilAt)}</p>
                   </div>
                 ))}
-                {scopedAnnouncements.length === 0 ? <div className="empty-card">No announcements published yet for this church.</div> : null}
+                {activeScopedAnnouncements.length === 0 ? <div className="empty-card">No active announcements are published for this church.</div> : null}
               </div>
             </article>
 
-            <article className="composer-card updates-card">
+            <article className="composer-card updates-card event-management-card">
               <p className="panel-kicker">Events</p>
-              <h3>Events for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
+              <h3>Publish events for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
               <div className="form-grid">
+                <div className="form-row">
+                  <label className="toggle-row">
+                    <input
+                      type="radio"
+                      checked={eventForm.scopeType === 'church'}
+                      onChange={() => setEventForm((current) => ({
+                        ...current,
+                        scopeType: 'church',
+                        isPublic: false,
+                        location: current.location || (selectedChurch?.address ?? ''),
+                      }))}
+                    />
+                    Church specific event
+                  </label>
+                  <label className="toggle-row">
+                    <input
+                      type="radio"
+                      checked={eventForm.scopeType === 'network'}
+                      onChange={() => setEventForm((current) => ({ ...current, scopeType: 'network', isPublic: true }))}
+                    />
+                    Common event across all churches
+                  </label>
+                </div>
                 <input className="auth-input" type="text" value={eventForm.title} onChange={(event) => setEventForm((current) => ({ ...current, title: event.target.value }))} placeholder="Event title" />
                 <textarea className="auth-input content-area" value={eventForm.description} onChange={(event) => setEventForm((current) => ({ ...current, description: event.target.value }))} placeholder="Event description" />
                 <div className="form-row">
                   <input className="auth-input" type="datetime-local" value={eventForm.startAt} onChange={(event) => setEventForm((current) => ({ ...current, startAt: event.target.value }))} />
                   <input className="auth-input" type="datetime-local" value={eventForm.endAt} onChange={(event) => setEventForm((current) => ({ ...current, endAt: event.target.value }))} />
                 </div>
-                <input className="auth-input" type="text" value={eventForm.location} onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))} placeholder="Church address" />
-                <button type="button" className="action-button publish" onClick={() => void handlePublishEvent()}>Publish event</button>
+                <input className="auth-input" type="text" value={eventForm.location} onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))} placeholder={eventForm.scopeType === 'network' ? 'Online / host location' : 'Church address'} />
+                <div className="form-row event-poster-row">
+                  <label className="event-poster-upload">
+                    <span>Upload poster</span>
+                    <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0] ?? null; void handleEventPosterUpload(file); event.currentTarget.value = ''; }} />
+                  </label>
+                  {eventForm.posterUrl ? (
+                    <div className="event-poster-preview-shell">
+                      <img className="event-poster-preview" src={eventForm.posterUrl} alt="Event poster preview" />
+                      <div className="event-poster-copy">
+                        <strong>{eventForm.posterFileName || 'Poster selected'}</strong>
+                        <button type="button" className="member-cancel-button compact-action" onClick={() => setEventForm((current) => ({ ...current, posterUrl: '', posterFileName: '' }))}>Remove poster</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="empty-card compact-empty-card">No poster uploaded for this event.</div>
+                  )}
+                </div>
+                <button type="button" className="action-button publish" onClick={() => void handlePublishEvent()} disabled={!canPublishEvents}>Publish event</button>
               </div>
-              <div className="update-list">
-                {scopedEvents.map((event) => (
-                  <div key={event.id} className="update-card">
-                    <strong>{event.title}</strong>
+            </article>
+            <article className="wide-card updates-meetings-summary">
+              <div className="updates-meetings-summary-grid">
+                <div className="common-meeting-intro">
+                  <strong>{`${selectedChurch?.displayCity ?? 'Church'} Meetings`}</strong>
+                  <p className="detail-copy">Default church-specific meetings and Sunday service instances for the selected church.</p>
+                </div>
+                <div className="common-meeting-intro">
+                  <strong>Bethel Church Common Meetings</strong>
+                  <p className="detail-copy">Shared recurring Bethel meetings across all churches, with per-instance delete and restore controls.</p>
+                </div>
+              </div>
+            </article>
+            <article className="composer-card updates-card event-management-card">
+              <p className="panel-kicker">Church specific events</p>
+              <h3>Published church-specific events for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
+              <div className="update-list event-instance-list">
+                {upcomingChurchSpecificMeetings.map((meeting) => (
+                  <div key={`${meeting.key}-${meeting.occurrenceDate}`} className={`update-card announcement-update-card ${meeting.isCancelled ? 'common-meeting-cancelled' : ''}`}>
+                    <div className="announcement-update-card-top">
+                      <strong>{meeting.title}</strong>
+                      {!meeting.isCancelled ? (
+                        <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleCancelChurchSpecificMeeting(meeting)} disabled={!canManageCommonMeetings}>Delete</button>
+                      ) : (
+                        <button type="button" className="action-button publish compact-action announcement-delete-button" onClick={() => void handleRestoreChurchSpecificMeeting(meeting)} disabled={!canManageCommonMeetings}>Restore instance</button>
+                      )}
+                    </div>
+                    <p className="muted-line"><span className="mini-chip">{selectedChurch?.displayCity ?? 'Church'} event</span></p>
+                    <p className="detail-copy">{meeting.description}</p>
+                    <p className="muted-line">{formatDateTimeRange(meeting.startAt, meeting.endAt)}</p>
+                    <p className="muted-line">{meeting.location}</p>
+                  </div>
+                ))}
+                {scopedChurchSpecificEvents.map((event) => (
+                  <div key={event.id} className="update-card announcement-update-card">
+                    {event.posterUrl ? <img className="update-card-poster" src={event.posterUrl} alt={`${event.title} poster`} /> : null}
+                    <div className="announcement-update-card-top">
+                      <strong>{event.title}</strong>
+                      <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleDeleteEvent(event)} disabled={!canPublishEvents}>Delete</button>
+                    </div>
+                    <p className="muted-line"><span className="mini-chip">{event.scopeLabel ?? selectedChurch?.displayCity ?? 'Church'} event</span></p>
                     <p className="detail-copy">{event.description}</p>
                     <p className="muted-line">{formatDateTimeRange(event.startAt, event.endAt)}</p>
                     <p className="muted-line">{event.location}</p>
                   </div>
                 ))}
-                {scopedEvents.length === 0 ? <div className="empty-card">No events published yet for this church.</div> : null}
+                {upcomingChurchSpecificMeetings.length === 0 && scopedChurchSpecificEvents.length === 0 ? <div className="empty-card">No church-specific meeting instances or published events are available yet.</div> : null}
+              </div>
+            </article>
+
+            <article className="composer-card updates-card event-management-card">
+              <p className="panel-kicker">Common events</p>
+              <h3>Published common events across all churches</h3>
+              <div className="update-list event-instance-list">
+                {upcomingCommonMeetings.map((meeting) => (
+                  <div key={`${meeting.key}-${meeting.occurrenceDate}`} className={`update-card announcement-update-card ${meeting.isCancelled ? 'common-meeting-cancelled' : ''}`}>
+                    <div className="announcement-update-card-top">
+                      <strong>{meeting.title}</strong>
+                      {!meeting.isCancelled ? (
+                        <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleCancelCommonMeeting(meeting)} disabled={!canManageCommonMeetings}>Delete</button>
+                      ) : (
+                        <button type="button" className="action-button publish compact-action announcement-delete-button" onClick={() => void handleRestoreCommonMeeting(meeting)} disabled={!canManageCommonMeetings}>Restore instance</button>
+                      )}
+                    </div>
+                    <p className="muted-line"><span className="mini-chip">Bethel Church event</span></p>
+                    <p className="detail-copy">{meeting.description}</p>
+                    <p className="muted-line">{formatDateTimeRange(meeting.startAt, meeting.endAt)}</p>
+                    <p className="muted-line">{meeting.location}</p>
+                  </div>
+                ))}
+                {scopedCommonEvents.map((event) => (
+                  <div key={event.id} className="update-card announcement-update-card">
+                    {event.posterUrl ? <img className="update-card-poster" src={event.posterUrl} alt={`${event.title} poster`} /> : null}
+                    <div className="announcement-update-card-top">
+                      <strong>{event.title}</strong>
+                      <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleDeleteEvent(event)} disabled={!canPublishEvents}>Delete</button>
+                    </div>
+                    <p className="muted-line"><span className="mini-chip">Common event</span></p>
+                    <p className="detail-copy">{event.description}</p>
+                    <p className="muted-line">{formatDateTimeRange(event.startAt, event.endAt)}</p>
+                    <p className="muted-line">{event.location}</p>
+                  </div>
+                ))}
+                {upcomingCommonMeetings.length === 0 && scopedCommonEvents.length === 0 ? <div className="empty-card">No common meetings or published common events are available yet.</div> : null}
               </div>
             </article>
           </section>
         ) : null}
 
-        {activeView === 'churches' ? <section className="dashboard-grid">{adminProfile.roleKey === 'networkSuperAdmin' ? <article className="wide-card"><div className="section-heading"><div><p className="panel-kicker">Add church location</p><h3>Create a new church with the default teams already included</h3></div></div><div className="form-grid church-form-grid"><input className="auth-input" type="text" value={churchForm.name} onChange={(event) => setChurchForm((current) => ({ ...current, name: event.target.value }))} placeholder="Church name" /><input className="auth-input" type="text" value={churchForm.city} onChange={(event) => setChurchForm((current) => ({ ...current, city: event.target.value }))} placeholder="City" /><input className="auth-input" type="text" value={churchForm.displayCity} onChange={(event) => setChurchForm((current) => ({ ...current, displayCity: event.target.value }))} placeholder="Display city" /><input className="auth-input" type="text" value={churchForm.address} onChange={(event) => setChurchForm((current) => ({ ...current, address: event.target.value }))} placeholder="Address" /><input className="auth-input" type="text" value={churchForm.serviceTimes} onChange={(event) => setChurchForm((current) => ({ ...current, serviceTimes: event.target.value }))} placeholder="Service time" /><input className="auth-input" type="text" value={churchForm.sharedDrivePath} onChange={(event) => setChurchForm((current) => ({ ...current, sharedDrivePath: event.target.value }))} placeholder="Drive path" /><input className="auth-input" type="text" value={churchForm.googleMapsLabel} onChange={(event) => setChurchForm((current) => ({ ...current, googleMapsLabel: event.target.value }))} placeholder="Google Maps label" /><input className="auth-input" type="text" value={churchForm.instagramUrl} onChange={(event) => setChurchForm((current) => ({ ...current, instagramUrl: event.target.value }))} placeholder="Instagram URL" /><input className="auth-input" type="text" value={churchForm.facebookUrl} onChange={(event) => setChurchForm((current) => ({ ...current, facebookUrl: event.target.value }))} placeholder="Facebook URL" /><button type="button" className="action-button publish" onClick={() => void handleCreateChurch()}>Add church location</button></div></article> : null}{churches.map((church) => <article key={church.id} className="church-card"><p className="panel-kicker">{church.city}</p><h3>{church.displayCity}</h3><p className="detail-copy">{church.name}</p><p className="detail-copy">{church.address}</p><div className="stats-inline"><span>{church.serviceTimes}</span><span>{church.members} members</span></div><div className="detail-block"><strong>Teams</strong><span>{mergeTeams(defaultTeams as unknown as string[], church.teams).join(', ')}</span></div><div className="detail-block"><strong>Instagram</strong><span>{church.instagramUrl || 'Not added yet'}</span></div><div className="detail-block"><strong>Facebook</strong><span>{church.facebookUrl || 'Not added yet'}</span></div></article>)}</section> : null}
+        {activeView === 'churches' ? (
+          <section className="dashboard-grid">
+            {adminProfile.roleKey === 'networkSuperAdmin' ? (
+              <article className="wide-card">
+                <div className="section-heading">
+                  <div>
+                    <p className="panel-kicker">Add church location</p>
+                    <h3>Create a new church with the default teams already included</h3>
+                  </div>
+                </div>
+                <div className="form-grid church-form-grid">
+                  <input className="auth-input" type="text" value={churchForm.name} onChange={(event) => setChurchForm((current) => ({ ...current, name: event.target.value }))} placeholder="Church name" />
+                  <input className="auth-input" type="text" value={churchForm.city} onChange={(event) => setChurchForm((current) => ({ ...current, city: event.target.value }))} placeholder="City" />
+                  <input className="auth-input" type="text" value={churchForm.displayCity} onChange={(event) => setChurchForm((current) => ({ ...current, displayCity: event.target.value }))} placeholder="Display city" />
+                  <input className="auth-input" type="text" value={churchForm.address} onChange={(event) => setChurchForm((current) => ({ ...current, address: event.target.value }))} placeholder="Address" />
+                  <input className="auth-input" type="text" value={churchForm.serviceTimes} onChange={(event) => setChurchForm((current) => ({ ...current, serviceTimes: event.target.value }))} placeholder="Service time" />
+                  <input className="auth-input" type="text" value={churchForm.sharedDrivePath} onChange={(event) => setChurchForm((current) => ({ ...current, sharedDrivePath: event.target.value }))} placeholder="Drive path" />
+                  <input className="auth-input" type="text" value={churchForm.googleMapsLabel} onChange={(event) => setChurchForm((current) => ({ ...current, googleMapsLabel: event.target.value }))} placeholder="Google Maps label" />
+                  <input className="auth-input" type="email" value={churchForm.contactEmail} onChange={(event) => setChurchForm((current) => ({ ...current, contactEmail: event.target.value }))} placeholder="Contact email" />
+                  <input className="auth-input" type="text" value={churchForm.contactPhone} onChange={(event) => setChurchForm((current) => ({ ...current, contactPhone: event.target.value }))} placeholder="Contact phone" />
+                  <input className="auth-input" type="text" value={churchForm.instagramUrl} onChange={(event) => setChurchForm((current) => ({ ...current, instagramUrl: event.target.value }))} placeholder="Instagram URL" />
+                  <input className="auth-input" type="text" value={churchForm.facebookUrl} onChange={(event) => setChurchForm((current) => ({ ...current, facebookUrl: event.target.value }))} placeholder="Facebook URL" />
+                  <button type="button" className="action-button publish" onClick={() => void handleCreateChurch()}>Add church location</button>
+                </div>
+              </article>
+            ) : null}
+            {churches.map((church) => {
+              const isEditing = churchEditId === church.id;
+              const draft = churchEditDrafts[church.id] ?? {
+                name: church.name,
+                city: church.city,
+                displayCity: church.displayCity,
+                address: church.address,
+                serviceTimes: church.serviceTimes,
+                sharedDrivePath: church.sharedDrivePath,
+                googleMapsLabel: church.googleMapsLabel,
+                contactEmail: church.contactEmail ?? '',
+                contactPhone: church.contactPhone ?? '',
+                instagramUrl: church.instagramUrl ?? '',
+                facebookUrl: church.facebookUrl ?? '',
+              };
 
-        {activeView === 'prayers' ? <section className="dashboard-grid"><article className="wide-card"><div className="section-heading"><div><p className="panel-kicker">Prayer moderation</p><h3>Requests for {selectedChurch?.displayCity ?? 'the selected church'}</h3></div></div><div className="request-list">{scopedPrayerRequests.map((request) => <article key={request.id} className="request-card selected"><div className="request-top"><div><p className="panel-kicker">Submitted {request.createdAt}</p><h3>{selectedChurch?.displayCity}</h3></div><span className={`status-badge ${request.status}`}>{request.status}</span></div><p>{request.preview}</p><div className="action-stack horizontal"><button type="button" className="action-button approve" onClick={() => void handleModeratePrayer(request.id, 'approved')}>Approve</button><button type="button" className="action-button reject" onClick={() => void handleModeratePrayer(request.id, 'hidden')}>Hide</button></div></article>)}{scopedPrayerRequests.length === 0 ? <div className="empty-card">No prayer requests are waiting for this church.</div> : null}</div></article></section> : null}
+              return (
+                <article key={church.id} className="church-card church-editor-card">
+                  <div className="section-heading">
+                    <div>
+                      <p className="panel-kicker">{church.city}</p>
+                      <h3>{church.displayCity}</h3>
+                    </div>
+                    {canEditChurch ? (
+                      <div className="chip-row">
+                        {!isEditing ? <button type="button" className="action-button church-edit-button" onClick={() => startChurchEdit(church)}>Edit church</button> : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  {isEditing ? (
+                    <div className="form-grid church-edit-grid">
+                      <input className="auth-input" type="text" value={draft.name} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, name: event.target.value } }))} placeholder="Church name" />
+                      <input className="auth-input" type="text" value={draft.displayCity} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, displayCity: event.target.value } }))} placeholder="Display city" />
+                      <input className="auth-input" type="text" value={draft.city} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, city: event.target.value } }))} placeholder="City" />
+                      <input className="auth-input" type="text" value={draft.serviceTimes} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, serviceTimes: event.target.value } }))} placeholder="Service times" />
+                      <input className="auth-input church-edit-span" type="text" value={draft.address} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, address: event.target.value } }))} placeholder="Address" />
+                      <input className="auth-input" type="text" value={draft.sharedDrivePath} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, sharedDrivePath: event.target.value } }))} placeholder="Drive path" />
+                      <input className="auth-input" type="text" value={draft.googleMapsLabel} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, googleMapsLabel: event.target.value } }))} placeholder="Google Maps label" />
+                      <input className="auth-input" type="email" value={draft.contactEmail} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, contactEmail: event.target.value } }))} placeholder="Contact email" />
+                      <input className="auth-input" type="text" value={draft.contactPhone} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, contactPhone: event.target.value } }))} placeholder="Contact phone" />
+                      <input className="auth-input" type="text" value={draft.instagramUrl} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, instagramUrl: event.target.value } }))} placeholder="Instagram URL" />
+                      <input className="auth-input" type="text" value={draft.facebookUrl} onChange={(event) => setChurchEditDrafts((current) => ({ ...current, [church.id]: { ...draft, facebookUrl: event.target.value } }))} placeholder="Facebook URL" />
+                      <div className="member-tile-actions church-edit-actions">
+                        <button type="button" className="action-button publish" onClick={() => void handleSaveChurchEdit(church)}>Save church</button>
+                        <button type="button" className="member-cancel-button" onClick={() => setChurchEditId(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="detail-copy">{church.name}</p>
+                      <p className="detail-copy">{church.address}</p>
+                      <div className="stats-inline"><span>{church.serviceTimes}</span><span>{church.members} members</span></div>
+                      <div className="detail-block"><strong>Contact email</strong><span>{church.contactEmail || 'Not added yet'}</span></div>
+                      <div className="detail-block"><strong>Contact phone</strong><span>{church.contactPhone || 'Not added yet'}</span></div>
+                      <div className="detail-block"><strong>Teams</strong><span>{mergeTeams(defaultTeams as unknown as string[], church.teams).join(', ')}</span></div>
+                      <div className="detail-block"><strong>Instagram</strong><span>{church.instagramUrl || 'Not added yet'}</span></div>
+                      <div className="detail-block"><strong>Facebook</strong><span>{church.facebookUrl || 'Not added yet'}</span></div>
+                    </>
+                  )}
+                </article>
+              );
+            })}
+          </section>
+        ) : null}
 
         {activeView === 'roles' ? <section className="dashboard-grid">{roleMatrix.map((item) => <article key={item.role} className="role-card"><p className="panel-kicker">Permission design</p><h3>{item.role}</h3><p className="detail-copy">{item.summary}</p></article>)}</section> : null}
       </main>
@@ -2585,16 +4027,11 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('worship')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="17" cy="21" r="4.8" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M9 45C11.5 33 14.2 27.5 17 27.5C19.8 27.5 22.6 33 25 45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="32" cy="15" r="5.4" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M22.5 46C25 31.5 28 25.5 32 25.5C36 25.5 39 31.5 41.5 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="47" cy="21" r="4.8" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M39 45C41.4 33 44.2 27.5 47 27.5C49.8 27.5 52.6 33 55 45" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M25 50H39" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M32 50V59" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M48 10C53 6 58 10 58 15" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M53 6C60 1 64 8 64 14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+        <circle cx="32" cy="20" r="4.4" fill="none" stroke="#16364B" strokeWidth="2.8" />
+        <path d="M25 29C27 24 29.3 22 32 22C34.7 22 37 24 39 29" fill="none" stroke="#16364B" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M32 31V45" fill="none" stroke="#BD8A37" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M24 38H40" fill="none" stroke="#BD8A37" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M15 44C20.5 36 26.2 32 32 32C37.8 32 43.5 36 49 44" fill="none" stroke="#2E7B69" strokeWidth="2.3" strokeLinecap="round" />
       </svg>
     );
   }
@@ -2602,13 +4039,11 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('speaker')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="28" cy="13" r="5.6" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M20 28C22.5 20.5 25.2 17.5 28 17.5C30.8 17.5 33.5 20.5 36 28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M16 47H40" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M21 47L24.5 30H31.5L35 47" fill="none" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
-        <path d="M42 18C48 15 53 19 53 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M48 10C57 7 63 14 63 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M11 18C6 15 2 19 2 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M22 46H42" fill="none" stroke="#16364B" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M25.5 46L29.5 30H34.5L38.5 46" fill="none" stroke="#16364B" strokeWidth="2.8" strokeLinejoin="round" />
+        <circle cx="32" cy="18" r="4.2" fill="none" stroke="#16364B" strokeWidth="2.8" />
+        <path d="M43 27C48 25 52 27.5 52 32" fill="none" stroke="#BD8A37" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M46 20C53 16.5 58 21 58 30" fill="none" stroke="#BD8A37" strokeWidth="2.3" strokeLinecap="round" />
       </svg>
     );
   }
@@ -2616,13 +4051,13 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('food')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="28" cy="32" r="16" fill="none" stroke="currentColor" strokeWidth="3.2" />
-        <circle cx="28" cy="32" r="9" fill="none" stroke="currentColor" strokeWidth="2.7" />
-        <path d="M10 16V46" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M4 16H16" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M4 28H14" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M50 14V46" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-        <ellipse cx="50" cy="14" rx="4.2" ry="2.8" fill="none" stroke="currentColor" strokeWidth="2.8" />
+        <circle cx="32" cy="32" r="11.5" fill="none" stroke="#16364B" strokeWidth="2.8" />
+        <circle cx="32" cy="32" r="20.5" fill="none" stroke="#16364B" strokeWidth="2.8" />
+        <path d="M12 22V42" fill="none" stroke="#BD8A37" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M9 22H15" fill="none" stroke="#BD8A37" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M9 29H15" fill="none" stroke="#BD8A37" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M52 21V42" fill="none" stroke="#2E7B69" strokeWidth="2.8" strokeLinecap="round" />
+        <ellipse cx="52" cy="21" rx="3.2" ry="2.3" fill="none" stroke="#2E7B69" strokeWidth="2.3" />
       </svg>
     );
   }
@@ -2630,15 +4065,13 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('sunday school')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="18" cy="21" r="5.2" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M10 46C12.5 35 15 29 18 29C21 29 23.8 35 26 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="34" cy="14" r="6" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M24 44C26.5 31.5 30 24 34 24C38 24 41.5 31.5 44 44" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="50" cy="21" r="5.2" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M42 46C44.2 35 47 29 50 29C53 29 55.5 35 58 46" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M6 52H58" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M24 48L30 42L36 48" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M40 48L46 42L52 48" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="18" y="20" width="28" height="19" rx="3" fill="none" stroke="#16364B" strokeWidth="2.8" />
+        <path d="M32 20V39" fill="none" stroke="#16364B" strokeWidth="2.3" />
+        <path d="M22 27H27" fill="none" stroke="#BD8A37" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M22 33H27" fill="none" stroke="#BD8A37" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M37 27H42" fill="none" stroke="#BD8A37" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M37 33H42" fill="none" stroke="#BD8A37" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M20 48C24 43 28 40 32 40C36 40 40 43 44 48" fill="none" stroke="#2E7B69" strokeWidth="2.3" strokeLinecap="round" />
       </svg>
     );
   }
@@ -2646,23 +4079,21 @@ function TeamIcon({ teamName }: { teamName: string }) {
   if (normalizedTeam.includes('tech')) {
     return (
       <svg viewBox="0 0 64 64" aria-hidden="true">
-        <rect x="9" y="16" width="30" height="20" rx="3.8" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d="M22 38V43" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M15 47H29" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M48 14V42" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="48" cy="26" r="5.4" fill="none" stroke="currentColor" strokeWidth="2.6" />
-        <path d="M58 10V48" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="58" cy="36" r="5.4" fill="none" stroke="currentColor" strokeWidth="2.6" />
-        <path d="M14 26H32" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
-        <path d="M14 31H26" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+        <rect x="17" y="21" width="22" height="15" rx="3.5" fill="none" stroke="#16364B" strokeWidth="2.8" />
+        <path d="M28 39V44" fill="none" stroke="#16364B" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M22 48H34" fill="none" stroke="#16364B" strokeWidth="2.8" strokeLinecap="round" />
+        <path d="M46 20V44" fill="none" stroke="#BD8A37" strokeWidth="2.8" strokeLinecap="round" />
+        <circle cx="46" cy="32" r="4.4" fill="none" stroke="#BD8A37" strokeWidth="2.3" />
+        <path d="M56 25V51" fill="none" stroke="#2E7B69" strokeWidth="2.8" strokeLinecap="round" />
+        <circle cx="56" cy="42" r="4.4" fill="none" stroke="#2E7B69" strokeWidth="2.3" />
       </svg>
     );
   }
 
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="32" cy="17" r="8" fill="none" stroke="currentColor" strokeWidth="3.6" />
-      <path d="M18 46C22 29 26 23 32 23C38 23 42 29 46 46" fill="none" stroke="currentColor" strokeWidth="3.6" strokeLinecap="round" />
+      <circle cx="32" cy="24" r="6" fill="none" stroke="#16364B" strokeWidth="2.8" />
+      <path d="M22 46C25 33 28 28 32 28C36 28 39 33 42 46" fill="none" stroke="#16364B" strokeWidth="2.8" strokeLinecap="round" />
     </svg>
   );
 }

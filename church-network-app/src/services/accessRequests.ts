@@ -42,6 +42,8 @@ export async function createAccessRequest(authSession: AuthSession, payload: Acc
         displayName: payload.displayName.trim(),
         photoUrl: authSession.photoUrl || null,
         phoneNumber: payload.phoneNumber.trim() || null,
+        phoneVerificationStatus: payload.phoneNumber.trim() ? 'pending' : 'missing',
+        phoneVerifiedAt: null,
         primaryChurchId: payload.requestedChurchId,
         approvalStatus: 'pending',
         pendingChurchId: payload.requestedChurchId,

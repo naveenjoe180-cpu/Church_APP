@@ -20,6 +20,8 @@ export type Church = {
   serviceTimes: string;
   sharedDrivePath: string;
   googleMapsLabel: string;
+  contactEmail?: string;
+  contactPhone?: string;
   instagramUrl?: string;
   facebookUrl?: string;
   teams: string[];
@@ -30,6 +32,7 @@ export type AccessRequest = {
   uid?: string;
   fullName: string;
   email: string;
+  phoneNumber?: string;
   churchId: string;
   requestedRoles: RoleKey[];
   note: string;
@@ -51,6 +54,7 @@ export type ChurchAnnouncement = {
   title: string;
   body: string;
   publishedAt: string;
+  visibleUntilAt?: string;
   publishedBy: string;
   isPublic: boolean;
 };
@@ -58,6 +62,8 @@ export type ChurchAnnouncement = {
 export type ChurchEventItem = {
   id: string;
   churchId: string;
+  scopeType?: 'church' | 'network';
+  scopeLabel?: string;
   title: string;
   description: string;
   location: string;
@@ -65,6 +71,7 @@ export type ChurchEventItem = {
   endAt: string;
   createdBy: string;
   teamName?: string;
+  posterUrl?: string;
   isPublic: boolean;
 };
 
@@ -88,5 +95,18 @@ export type MemberRecord = {
   teamName: string;
   teamNames: string[];
   approvalStatus: AccessRequestStatus;
+  phoneNumber?: string;
+  phoneVerificationStatus: 'missing' | 'pending' | 'verified';
+};
+
+export type AuditEntry = {
+  id: string;
+  churchId: string;
+  entityType: 'approval' | 'member' | 'team' | 'role' | 'planning' | 'church' | 'archive';
+  actionLabel: string;
+  targetLabel: string;
+  summary: string;
+  actor: string;
+  createdAt: string;
 };
 

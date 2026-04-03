@@ -1,6 +1,7 @@
 **/node_modules/
 **/.expo/
 **/dist/
+functions/lib/
 **/web-build/
 **/.DS_Store
 **/coverage/

@@ -19,11 +19,23 @@ import {
 } from 'firebase/firestore';
 
 import { firestoreDb } from '../config/firebase';
-import type { AccessRequest, Church, ChurchAnnouncement, ChurchEventItem, MemberRecord, PrayerRequest, RoleKey, VolunteerAssignment } from '../types';
+import type { AccessRequest, AuditEntry, Church, ChurchAnnouncement, ChurchEventItem, MemberRecord, PrayerRequest, RoleKey, VolunteerAssignment } from '../types';
 
 function normalizeTimestamp(value: Timestamp | string | null | undefined, fallback = 'Pending timestamp') {
   if (!value) {
     return fallback;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value.toDate().toISOString();
+}
+
+function normalizeOptionalTimestamp(value: Timestamp | string | null | undefined) {
+  if (!value) {
+    return undefined;
   }
 
   if (typeof value === 'string') {
@@ -62,12 +74,22 @@ function normalizeError(error: FirestoreError | Error | unknown, fallback: strin
   return new Error(fallback);
 }
 
+function ensureBethelPrefix(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return trimmedValue;
+  }
+
+  return /^bethel\s+/i.test(trimmedValue) ? trimmedValue : `Bethel ${trimmedValue}`;
+}
+
 function mapAccessRequest(id: string, rawValue: Record<string, unknown>): AccessRequest {
   return {
     id,
     uid: typeof rawValue.uid === 'string' ? rawValue.uid : undefined,
     fullName: typeof rawValue.fullName === 'string' ? rawValue.fullName : 'Pending member',
     email: typeof rawValue.email === 'string' ? rawValue.email : 'unknown@example.com',
+    phoneNumber: typeof rawValue.phoneNumber === 'string' ? rawValue.phoneNumber : undefined,
     churchId:
       typeof rawValue.churchId === 'string'
         ? rawValue.churchId
@@ -105,10 +127,16 @@ function mapPrayerRequest(id: string, rawValue: Record<string, unknown>): Prayer
 function mapAnnouncement(id: string, rawValue: Record<string, unknown>): ChurchAnnouncement {
   return {
     id,
-    churchId: typeof rawValue.scopeChurchId === 'string' ? rawValue.scopeChurchId : '',
+    churchId:
+      typeof rawValue.scopeChurchId === 'string'
+        ? rawValue.scopeChurchId
+        : typeof rawValue.churchId === 'string'
+          ? rawValue.churchId
+          : '',
     title: typeof rawValue.title === 'string' ? rawValue.title : 'Church announcement',
     body: typeof rawValue.body === 'string' ? rawValue.body : 'No announcement details were provided.',
     publishedAt: normalizeTimestamp((rawValue.publishedAt as Timestamp | null | undefined) ?? (rawValue.createdAt as Timestamp | null | undefined)),
+    visibleUntilAt: normalizeOptionalTimestamp((rawValue.visibleUntilAt as Timestamp | string | null | undefined) ?? null),
     publishedBy: typeof rawValue.publishedBy === 'string' ? rawValue.publishedBy : 'Church office',
     isPublic: rawValue.isPublic === true,
   };
@@ -116,10 +144,18 @@ function mapAnnouncement(id: string, rawValue: Record<string, unknown>): ChurchA
 
 function mapChurchEvent(id: string, rawValue: Record<string, unknown>): ChurchEventItem {
   const fallbackStart = normalizeTimestamp((rawValue.createdAt as Timestamp | null | undefined) ?? null);
+  const isLegacyCommonEvent = rawValue.isPublic === true || rawValue.scopeType === 'network' || rawValue.churchId === 'network';
 
   return {
     id,
-    churchId: typeof rawValue.churchId === 'string' ? rawValue.churchId : '',
+    churchId:
+      isLegacyCommonEvent
+        ? 'network'
+        : typeof rawValue.churchId === 'string'
+          ? rawValue.churchId
+          : '',
+    scopeType: isLegacyCommonEvent ? 'network' : 'church',
+    scopeLabel: typeof rawValue.scopeLabel === 'string' ? rawValue.scopeLabel : undefined,
     title: typeof rawValue.title === 'string' ? rawValue.title : 'Church event',
     description: typeof rawValue.description === 'string' ? rawValue.description : 'Event details will be shared soon.',
     location: typeof rawValue.location === 'string' ? rawValue.location : 'Church location',
@@ -127,6 +163,7 @@ function mapChurchEvent(id: string, rawValue: Record<string, unknown>): ChurchEv
     endAt: normalizeTimestamp((rawValue.endAt as Timestamp | string | null | undefined) ?? null, fallbackStart),
     createdBy: typeof rawValue.createdBy === 'string' ? rawValue.createdBy : 'Church admin',
     teamName: typeof rawValue.teamName === 'string' ? rawValue.teamName : undefined,
+    posterUrl: typeof rawValue.posterUrl === 'string' ? rawValue.posterUrl : undefined,
     isPublic: rawValue.isPublic === true,
   };
 }
@@ -158,6 +195,28 @@ function mapVolunteerAssignment(id: string, rawValue: Record<string, unknown>): 
       rawValue.responseStatus === 'accepted' || rawValue.responseStatus === 'declined' || rawValue.responseStatus === 'pending'
         ? rawValue.responseStatus
         : 'pending',
+  };
+}
+
+function mapAuditEntry(id: string, rawValue: Record<string, unknown>): AuditEntry {
+  return {
+    id,
+    churchId: typeof rawValue.churchId === 'string' ? rawValue.churchId : '',
+    entityType:
+      rawValue.entityType === 'approval'
+      || rawValue.entityType === 'member'
+      || rawValue.entityType === 'team'
+      || rawValue.entityType === 'role'
+      || rawValue.entityType === 'planning'
+      || rawValue.entityType === 'church'
+      || rawValue.entityType === 'archive'
+        ? rawValue.entityType
+        : 'church',
+    actionLabel: typeof rawValue.actionLabel === 'string' ? rawValue.actionLabel : 'Updated',
+    targetLabel: typeof rawValue.targetLabel === 'string' ? rawValue.targetLabel : 'Church record',
+    summary: typeof rawValue.summary === 'string' ? rawValue.summary : 'No summary captured.',
+    actor: typeof rawValue.actor === 'string' ? rawValue.actor : 'Church admin',
+    createdAt: normalizeTimestamp((rawValue.createdAt as Timestamp | null | undefined) ?? null),
   };
 }
 
@@ -217,6 +276,13 @@ function mapMember(id: string, rawValue: Record<string, unknown>): MemberRecord 
       rawValue.approvalStatus === 'approved' || rawValue.approvalStatus === 'rejected' || rawValue.approvalStatus === 'pending'
         ? rawValue.approvalStatus
         : 'pending',
+    phoneNumber: typeof rawValue.phoneNumber === 'string' ? rawValue.phoneNumber : undefined,
+    phoneVerificationStatus:
+      rawValue.phoneVerificationStatus === 'verified'
+      || rawValue.phoneVerificationStatus === 'pending'
+      || rawValue.phoneVerificationStatus === 'missing'
+        ? rawValue.phoneVerificationStatus
+        : 'missing',
   };
 }
 
@@ -359,12 +425,15 @@ export function subscribeToAnnouncements(
   const announcementsQuery = query(
     collection(firestoreDb, 'announcements'),
     where('scopeChurchId', '==', churchId),
-    orderBy('publishedAt', 'desc'),
   );
   return onSnapshot(
     announcementsQuery,
     (snapshot) => {
-      onData(snapshot.docs.map((item) => mapAnnouncement(item.id, item.data() as Record<string, unknown>)));
+      onData(
+        snapshot.docs
+          .map((item) => mapAnnouncement(item.id, item.data() as Record<string, unknown>))
+          .sort((left, right) => new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime()),
+      );
     },
     (error) => {
       onError?.(normalizeError(error, 'Unable to load church announcements from Firestore.'));
@@ -381,16 +450,230 @@ export function subscribeToEvents(
     return () => undefined;
   }
 
-  const eventsQuery = query(collection(firestoreDb, 'events'), where('churchId', '==', churchId), orderBy('startAt', 'asc'));
-  return onSnapshot(
-    eventsQuery,
+  let localEvents: ChurchEventItem[] = [];
+  let sharedEvents: ChurchEventItem[] = [];
+
+  const emitCombinedEvents = () => {
+    const combinedEvents = [...localEvents, ...sharedEvents]
+      .reduce<ChurchEventItem[]>((accumulator, event) => {
+        if (accumulator.some((existing) => existing.id === event.id)) {
+          return accumulator;
+        }
+
+        accumulator.push(event);
+        return accumulator;
+      }, [])
+      .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
+    onData(combinedEvents);
+  };
+
+  const localEventsQuery = query(collection(firestoreDb, 'events'), where('churchId', '==', churchId));
+  const sharedEventsQuery = query(collection(firestoreDb, 'events'), where('scopeType', '==', 'network'));
+
+  const unsubscribeLocal = onSnapshot(
+    localEventsQuery,
     (snapshot) => {
-      onData(snapshot.docs.map((item) => mapChurchEvent(item.id, item.data() as Record<string, unknown>)));
+      localEvents = snapshot.docs.map((item) => mapChurchEvent(item.id, item.data() as Record<string, unknown>));
+      emitCombinedEvents();
     },
     (error) => {
       onError?.(normalizeError(error, 'Unable to load church events from Firestore.'));
     },
   );
+
+  const unsubscribeShared = onSnapshot(
+    sharedEventsQuery,
+    (snapshot) => {
+      sharedEvents = snapshot.docs.map((item) => mapChurchEvent(item.id, item.data() as Record<string, unknown>));
+      emitCombinedEvents();
+    },
+    (error) => {
+      sharedEvents = [];
+      emitCombinedEvents();
+      onError?.(normalizeError(error, 'Unable to load shared network events from Firestore.'));
+    },
+  );
+
+  return () => {
+    unsubscribeLocal();
+    unsubscribeShared();
+  };
+}
+
+export function subscribeToCommonMeetingCancellations(
+  churchId: string,
+  onData: (keys: string[]) => void,
+  onError?: (error: Error) => void,
+) {
+  if (!firestoreDb) {
+    onData([]);
+    return () => undefined;
+  }
+
+  const cancellationsQuery = query(
+    collection(firestoreDb, 'commonMeetingCancellations'),
+    where('churchId', '==', churchId),
+  );
+
+  return onSnapshot(
+    cancellationsQuery,
+    (snapshot) => {
+      onData(
+        snapshot.docs
+          .map((item) => {
+            const rawValue = item.data() as Record<string, unknown>;
+            const meetingKey = typeof rawValue.meetingKey === 'string' ? rawValue.meetingKey : '';
+            const occurrenceDate = typeof rawValue.occurrenceDate === 'string' ? rawValue.occurrenceDate : '';
+            return meetingKey && occurrenceDate ? `${meetingKey}:${occurrenceDate}` : '';
+          })
+          .filter(Boolean),
+      );
+    },
+    (error) => {
+      onError?.(normalizeError(error, 'Unable to load common meeting changes from Firestore.'));
+    },
+  );
+}
+
+export function subscribeToChurchSpecificMeetingCancellations(
+  churchId: string,
+  onData: (keys: string[]) => void,
+  onError?: (error: Error) => void,
+) {
+  if (!firestoreDb) {
+    onData([]);
+    return () => undefined;
+  }
+
+  const cancellationsQuery = query(
+    collection(firestoreDb, 'churchSpecificMeetingCancellations'),
+    where('churchId', '==', churchId),
+  );
+
+  return onSnapshot(
+    cancellationsQuery,
+    (snapshot) => {
+      onData(
+        snapshot.docs
+          .map((item) => {
+            const rawValue = item.data() as Record<string, unknown>;
+            const meetingKey = typeof rawValue.meetingKey === 'string' ? rawValue.meetingKey : '';
+            const occurrenceDate = typeof rawValue.occurrenceDate === 'string' ? rawValue.occurrenceDate : '';
+            return meetingKey && occurrenceDate ? `${meetingKey}:${occurrenceDate}` : '';
+          })
+          .filter(Boolean),
+      );
+    },
+    (error) => {
+      onError?.(normalizeError(error, 'Unable to load church-specific meeting changes from Firestore.'));
+    },
+  );
+}
+
+export async function cancelCommonMeetingOccurrence(payload: {
+  churchId: string;
+  meetingKey: string;
+  occurrenceDate: string;
+  title: string;
+}) {
+  if (!firestoreDb) {
+    return;
+  }
+
+  await setDoc(doc(firestoreDb, 'commonMeetingCancellations', `${payload.churchId}_${payload.meetingKey}_${payload.occurrenceDate}`), {
+    churchId: payload.churchId,
+    meetingKey: payload.meetingKey,
+    occurrenceDate: payload.occurrenceDate,
+    title: payload.title,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function restoreCommonMeetingOccurrence(churchId: string, meetingKey: string, occurrenceDate: string) {
+  if (!firestoreDb) {
+    return;
+  }
+
+  await deleteDoc(doc(firestoreDb, 'commonMeetingCancellations', `${churchId}_${meetingKey}_${occurrenceDate}`));
+}
+
+export async function cancelChurchSpecificMeetingOccurrence(payload: {
+  churchId: string;
+  meetingKey: string;
+  occurrenceDate: string;
+  title: string;
+}) {
+  if (!firestoreDb) {
+    return;
+  }
+
+  await setDoc(doc(firestoreDb, 'churchSpecificMeetingCancellations', `${payload.churchId}_${payload.meetingKey}_${payload.occurrenceDate}`), {
+    churchId: payload.churchId,
+    meetingKey: payload.meetingKey,
+    occurrenceDate: payload.occurrenceDate,
+    title: payload.title,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+export async function restoreChurchSpecificMeetingOccurrence(churchId: string, meetingKey: string, occurrenceDate: string) {
+  if (!firestoreDb) {
+    return;
+  }
+
+  await deleteDoc(doc(firestoreDb, 'churchSpecificMeetingCancellations', `${churchId}_${meetingKey}_${occurrenceDate}`));
+}
+
+export function subscribeToAuditEntries(
+  churchId: string | null,
+  onData: (entries: AuditEntry[]) => void,
+  onError?: (error: Error) => void,
+) {
+  if (!firestoreDb) {
+    return () => undefined;
+  }
+
+  const auditQuery = churchId
+    ? query(collection(firestoreDb, 'auditLogs'), where('churchId', '==', churchId), orderBy('createdAt', 'desc'))
+    : query(collection(firestoreDb, 'auditLogs'), orderBy('createdAt', 'desc'));
+
+  return onSnapshot(
+    auditQuery,
+    (snapshot) => {
+      const entries = snapshot.docs
+        .map((item) => mapAuditEntry(item.id, item.data() as Record<string, unknown>))
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      onData(entries);
+    },
+    (error) => {
+      onError?.(normalizeError(error, 'Unable to load audit history from Firestore.'));
+    },
+  );
+}
+
+export async function writeAuditEntry(payload: {
+  churchId: string;
+  entityType: AuditEntry['entityType'];
+  actionLabel: string;
+  targetLabel: string;
+  summary: string;
+  actor: string;
+}) {
+  if (!firestoreDb) {
+    return;
+  }
+
+  await addDoc(collection(firestoreDb, 'auditLogs'), {
+    churchId: payload.churchId,
+    entityType: payload.entityType,
+    actionLabel: payload.actionLabel,
+    targetLabel: payload.targetLabel,
+    summary: payload.summary,
+    actor: payload.actor,
+    createdAt: serverTimestamp(),
+  });
 }
 
 export async function updateAccessRequestStatus(
@@ -431,6 +714,9 @@ export async function updateAccessRequestStatus(
           approvalStatus: 'approved',
           primaryChurchId: request.churchId,
           pendingChurchId: null,
+          phoneNumber: request.phoneNumber ?? null,
+          phoneVerificationStatus: request.phoneNumber ? 'pending' : 'missing',
+          phoneVerifiedAt: null,
           ...buildNestedBooleanFields('churchAccess', [request.churchId]),
           ...buildNestedBooleanFields('roleFlags', nextRoles),
           updatedAt: serverTimestamp(),
@@ -456,6 +742,14 @@ export async function updatePrayerRequestStatus(requestId: string, nextStatus: '
     moderatedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deletePrayerRequest(requestId: string) {
+  if (!firestoreDb) {
+    throw new Error('Firebase is not configured for the admin dashboard.');
+  }
+
+  await deleteDoc(doc(firestoreDb, 'prayerRequests', requestId));
 }
 
 export async function updateMemberAssignments(payload: {
@@ -489,6 +783,8 @@ export async function updateMemberAssignments(payload: {
     approvalStatus: 'approved',
     primaryChurchId: payload.churchId,
     primaryTeamName: payload.teamNames[0] || null,
+    phoneVerificationStatus: 'missing',
+    phoneVerifiedAt: null,
     ...buildNestedBooleanFields('churchAccess', [payload.churchId]),
     ...nextRoleFlags,
     'roleFlags.networkSuperAdmin': existingRoleFlags.networkSuperAdmin === true,
@@ -585,6 +881,8 @@ export async function createChurchLocation(payload: {
   sharedDrivePath: string;
   googleMapsLabel: string;
   teams: string[];
+  contactEmail?: string;
+  contactPhone?: string;
   instagramUrl?: string;
   facebookUrl?: string;
 }) {
@@ -598,13 +896,15 @@ export async function createChurchLocation(payload: {
   }
 
   await setDoc(doc(firestoreDb, 'churches', churchId), {
-    name: payload.name.trim(),
+    name: ensureBethelPrefix(payload.name.trim()),
     city: payload.city.trim(),
-    displayCity: payload.displayCity.trim(),
+    displayCity: ensureBethelPrefix(payload.displayCity.trim()),
     address: payload.address.trim(),
     serviceTimes: payload.serviceTimes.trim(),
     sharedDrivePath: payload.sharedDrivePath.trim(),
     googleMapsLabel: payload.googleMapsLabel.trim(),
+    contactEmail: payload.contactEmail?.trim() || null,
+    contactPhone: payload.contactPhone?.trim() || null,
     teams: payload.teams,
     instagramUrl: payload.instagramUrl?.trim() || null,
     facebookUrl: payload.facebookUrl?.trim() || null,
@@ -617,21 +917,57 @@ export async function createChurchLocation(payload: {
 
   const churchRecord: Church = {
     id: churchId,
-    name: payload.name.trim(),
+    name: ensureBethelPrefix(payload.name.trim()),
     city: payload.city.trim(),
-    displayCity: payload.displayCity.trim(),
+    displayCity: ensureBethelPrefix(payload.displayCity.trim()),
     address: payload.address.trim(),
     admins: 1,
     members: 0,
     serviceTimes: payload.serviceTimes.trim(),
     sharedDrivePath: payload.sharedDrivePath.trim(),
     googleMapsLabel: payload.googleMapsLabel.trim(),
+    contactEmail: payload.contactEmail?.trim() || undefined,
+    contactPhone: payload.contactPhone?.trim() || undefined,
     instagramUrl: payload.instagramUrl?.trim() || undefined,
     facebookUrl: payload.facebookUrl?.trim() || undefined,
     teams: payload.teams,
   };
 
   return churchRecord;
+}
+
+export async function updateChurchLocation(payload: {
+  churchId: string;
+  name: string;
+  city: string;
+  displayCity: string;
+  address: string;
+  serviceTimes: string;
+  sharedDrivePath: string;
+  googleMapsLabel: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
+}) {
+  if (!firestoreDb) {
+    throw new Error('Firebase is not configured for the admin dashboard.');
+  }
+
+  await setDoc(doc(firestoreDb, 'churches', payload.churchId), {
+    name: ensureBethelPrefix(payload.name.trim()),
+    city: payload.city.trim(),
+    displayCity: ensureBethelPrefix(payload.displayCity.trim()),
+    address: payload.address.trim(),
+    serviceTimes: payload.serviceTimes.trim(),
+    sharedDrivePath: payload.sharedDrivePath.trim(),
+    googleMapsLabel: payload.googleMapsLabel.trim(),
+    contactEmail: payload.contactEmail?.trim() || null,
+    contactPhone: payload.contactPhone?.trim() || null,
+    instagramUrl: payload.instagramUrl?.trim() || null,
+    facebookUrl: payload.facebookUrl?.trim() || null,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 export async function addChurchTeam(churchId: string, teamName: string) {
@@ -672,6 +1008,7 @@ export async function publishAnnouncement(payload: {
   body: string;
   publishedBy: string;
   isPublic: boolean;
+  visibleUntilAt?: string;
 }) {
   if (!firestoreDb) {
     throw new Error('Firebase is not configured for the admin dashboard.');
@@ -680,6 +1017,7 @@ export async function publishAnnouncement(payload: {
   await addDoc(collection(firestoreDb, 'announcements'), {
     scopeType: 'church',
     scopeChurchId: payload.churchId,
+    churchId: payload.churchId,
     scopeTeamId: null,
     title: payload.title.trim(),
     body: payload.body.trim(),
@@ -688,36 +1026,61 @@ export async function publishAnnouncement(payload: {
     isPublic: payload.isPublic,
     publishedBy: payload.publishedBy,
     publishedAt: serverTimestamp(),
+    visibleUntilAt: payload.visibleUntilAt ? Timestamp.fromDate(new Date(payload.visibleUntilAt)) : null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 }
 
+export async function deleteAnnouncement(announcementId: string) {
+  if (!firestoreDb) {
+    throw new Error('Firebase is not configured for the admin dashboard.');
+  }
+
+  await deleteDoc(doc(firestoreDb, 'announcements', announcementId));
+}
+
 export async function publishEvent(payload: {
   churchId: string;
+  scopeType: 'church' | 'network';
+  scopeLabel: string;
   title: string;
   description: string;
   location: string;
   startAt: string;
   endAt: string;
   createdBy: string;
+  posterUrl?: string;
   isPublic: boolean;
 }) {
   if (!firestoreDb) {
     throw new Error('Firebase is not configured for the admin dashboard.');
   }
 
+  const resolvedChurchId = payload.scopeType === 'network' ? 'network' : payload.churchId;
+
   await addDoc(collection(firestoreDb, 'events'), {
-    churchId: payload.churchId,
+    churchId: resolvedChurchId,
+    scopeType: payload.scopeType,
+    scopeLabel: payload.scopeLabel,
     teamId: null,
     title: payload.title.trim(),
     description: payload.description.trim(),
     location: payload.location.trim(),
     startAt: normalizeDateInput(payload.startAt),
     endAt: normalizeDateInput(payload.endAt),
+    posterUrl: payload.posterUrl?.trim() || null,
     isPublic: payload.isPublic,
     createdBy: payload.createdBy,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deleteEvent(eventId: string) {
+  if (!firestoreDb) {
+    throw new Error('Firebase is not configured for the admin dashboard.');
+  }
+
+  await deleteDoc(doc(firestoreDb, 'events', eventId));
 }

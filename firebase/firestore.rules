@@ -41,6 +41,10 @@ service cloud.firestore {
       return isNetworkSuperAdmin() || (hasRole("churchAdmin") && belongsToChurch(churchId));
     }
 
+    function isAnyChurchAdmin() {
+      return hasRole("churchAdmin");
+    }
+
     function isPastor(churchId) {
       return isNetworkSuperAdmin() || (hasRole("pastor") && belongsToChurch(churchId));
     }
@@ -142,12 +146,8 @@ service cloud.firestore {
             resource.data.scopeChurchId == null
             || belongsToChurch(resource.data.scopeChurchId)
           )
-          && (
-            resource.data.scopeTeamId == null
-            || belongsToTeam(resource.data.scopeTeamId)
-          )
         );
-      allow write: if isSignedIn() && (
+      allow create, update: if isSignedIn() && (
         isNetworkSuperAdmin()
         || isChurchAdmin(request.resource.data.scopeChurchId)
         || (
@@ -156,19 +156,82 @@ service cloud.firestore {
           && isTeamLeader(request.resource.data.scopeChurchId, request.resource.data.scopeTeamId)
         )
       );
+      allow delete: if isSignedIn() && (
+        isNetworkSuperAdmin()
+        || isChurchAdmin(resource.data.scopeChurchId)
+        || (
+          resource.data.scopeChurchId is string
+          && resource.data.scopeTeamId is string
+          && isTeamLeader(resource.data.scopeChurchId, resource.data.scopeTeamId)
+        )
+      );
     }
 
     match /events/{eventId} {
       allow read: if resource.data.isPublic == true
         || isNetworkSuperAdmin()
-        || (isApproved() && belongsToChurch(resource.data.churchId));
-      allow write: if isSignedIn() && (
+        || (
+          isApproved()
+          && (
+            resource.data.scopeType == "network"
+            || belongsToChurch(resource.data.churchId)
+          )
+        );
+      allow create, update: if isSignedIn() && (
         isNetworkSuperAdmin()
+        || (
+          request.resource.data.scopeType == "network"
+          && isAnyChurchAdmin()
+        )
         || isChurchAdmin(request.resource.data.churchId)
         || (
           request.resource.data.teamId is string
           && isTeamLeader(request.resource.data.churchId, request.resource.data.teamId)
         )
+      );
+      allow delete: if isSignedIn() && (
+        isNetworkSuperAdmin()
+        || (
+          resource.data.scopeType == "network"
+          && isAnyChurchAdmin()
+        )
+        || isChurchAdmin(resource.data.churchId)
+        || (
+          resource.data.teamId is string
+          && isTeamLeader(resource.data.churchId, resource.data.teamId)
+        )
+      );
+    }
+
+    match /commonMeetingCancellations/{cancellationId} {
+      allow read: if isNetworkSuperAdmin()
+        || isChurchAdmin(resource.data.churchId)
+        || (isApproved() && belongsToChurch(resource.data.churchId));
+      allow create: if isSignedIn()
+        && request.resource.data.churchId is string
+        && (
+          isNetworkSuperAdmin()
+          || isChurchAdmin(request.resource.data.churchId)
+        );
+      allow delete: if isSignedIn() && (
+        isNetworkSuperAdmin()
+        || isChurchAdmin(resource.data.churchId)
+      );
+    }
+
+    match /churchSpecificMeetingCancellations/{cancellationId} {
+      allow read: if isNetworkSuperAdmin()
+        || isChurchAdmin(resource.data.churchId)
+        || (isApproved() && belongsToChurch(resource.data.churchId));
+      allow create: if isSignedIn()
+        && request.resource.data.churchId is string
+        && (
+          isNetworkSuperAdmin()
+          || isChurchAdmin(request.resource.data.churchId)
+        );
+      allow delete: if isSignedIn() && (
+        isNetworkSuperAdmin()
+        || isChurchAdmin(resource.data.churchId)
       );
     }
 
@@ -205,16 +268,49 @@ service cloud.firestore {
     }
 
     match /prayerRequests/{requestId} {
-      allow create: if isSignedIn();
-      allow read: if resource.data.status == "approved"
+      allow create: if isSignedIn()
+        && isApproved()
+        && request.resource.data.churchId is string
+        && belongsToChurch(request.resource.data.churchId)
+        && request.resource.data.submittedByUid == request.auth.uid;
+      allow read: if (
+          resource.data.status == "approved"
+          && isApproved()
+          && belongsToChurch(resource.data.churchId)
+        )
+        || (
+          isSignedIn()
+          && resource.data.submittedByUid == request.auth.uid
+        )
         || isNetworkSuperAdmin()
         || isChurchAdmin(resource.data.churchId)
         || isPastor(resource.data.churchId);
       allow update: if isSignedIn() && (
         isNetworkSuperAdmin()
         || isChurchAdmin(resource.data.churchId)
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.submittedByUid == request.auth.uid
+        || isNetworkSuperAdmin()
+        || isChurchAdmin(resource.data.churchId)
+      );
+    }
+
+    match /prayerResponses/{responseId} {
+      allow create, update: if isSignedIn()
+        && isApproved()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.prayerRequestId is string
+        && request.resource.data.churchId is string
+        && belongsToChurch(request.resource.data.churchId)
+        && request.resource.data.status == "prayed";
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || isNetworkSuperAdmin()
+        || isChurchAdmin(resource.data.churchId)
         || isPastor(resource.data.churchId)
       );
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /documents/{documentId} {
@@ -236,6 +332,30 @@ service cloud.firestore {
           && isTeamLeader(request.resource.data.churchId, request.resource.data.teamId)
         )
       );
+    }
+
+    match /notificationDevices/{deviceId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+        || isNetworkSuperAdmin()
+      );
+      allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.audienceUserId == request.auth.uid
+        || isNetworkSuperAdmin()
+        || (
+          resource.data.audienceChurchId is string
+          && (
+            isChurchAdmin(resource.data.audienceChurchId)
+            || isPastor(resource.data.audienceChurchId)
+          )
+        )
+      );
+      allow write, delete: if false;
     }
 
     match /auditLogs/{logId} {

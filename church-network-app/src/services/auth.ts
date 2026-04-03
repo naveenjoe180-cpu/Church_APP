@@ -1,10 +1,13 @@
 import {
   GoogleAuthProvider,
+  PhoneAuthProvider,
+  RecaptchaVerifier,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updatePhoneNumber,
   updateProfile,
   type User,
 } from 'firebase/auth';
@@ -19,6 +22,8 @@ export type AuthSession = {
   photoUrl: string;
   providerId: string;
 };
+
+let phoneRecaptchaVerifier: RecaptchaVerifier | null = null;
 
 function mapUser(user: User): AuthSession {
   if (!user.email) {
@@ -91,6 +96,15 @@ export async function createEmailAccount(email: string, password: string) {
   return mapCurrentUser();
 }
 
+export async function signInEmailAccount(email: string, password: string) {
+  if (!firebaseAuth) {
+    throw new Error('Firebase is not configured for the member app.');
+  }
+
+  await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+  return mapCurrentUser();
+}
+
 export async function updateMemberDisplayName(displayName: string) {
   if (!firebaseAuth?.currentUser) {
     return;
@@ -112,4 +126,77 @@ export async function signOutMember() {
   }
 
   await signOut(firebaseAuth);
+}
+
+function requirePhoneVerificationSupport() {
+  if (!firebaseAuth) {
+    throw new Error('Firebase is not configured for the member app.');
+  }
+
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    throw new Error('Phone verification is currently enabled in the web member app first.');
+  }
+}
+
+function createPhoneRecaptcha(containerId: string) {
+  requirePhoneVerificationSupport();
+
+  if (!containerId.trim()) {
+    throw new Error('Phone verification could not start because the reCAPTCHA container is missing.');
+  }
+
+  if (phoneRecaptchaVerifier) {
+    try {
+      phoneRecaptchaVerifier.clear();
+    } catch {
+      // Ignore stale reCAPTCHA instances before creating a fresh one.
+    }
+  }
+
+  phoneRecaptchaVerifier = new RecaptchaVerifier(firebaseAuth!, containerId, {
+    size: 'invisible',
+  });
+
+  return phoneRecaptchaVerifier;
+}
+
+export async function sendMemberPhoneVerificationCode(phoneNumber: string, containerId: string) {
+  requirePhoneVerificationSupport();
+
+  if (!phoneNumber.trim()) {
+    throw new Error('Add your phone number before requesting the verification code.');
+  }
+
+  const provider = new PhoneAuthProvider(firebaseAuth!);
+  const recaptchaVerifier = createPhoneRecaptcha(containerId);
+  return provider.verifyPhoneNumber(phoneNumber.trim(), recaptchaVerifier);
+}
+
+export async function confirmMemberPhoneVerificationCode(verificationId: string, verificationCode: string) {
+  requirePhoneVerificationSupport();
+
+  if (!firebaseAuth?.currentUser) {
+    throw new Error('Sign in again before confirming the verification code.');
+  }
+
+  if (!verificationId.trim() || !verificationCode.trim()) {
+    throw new Error('Enter the code that was sent to your phone.');
+  }
+
+  const credential = PhoneAuthProvider.credential(verificationId.trim(), verificationCode.trim());
+  await updatePhoneNumber(firebaseAuth.currentUser, credential);
+}
+
+export function clearMemberPhoneVerificationChallenge() {
+  if (!phoneRecaptchaVerifier) {
+    return;
+  }
+
+  try {
+    phoneRecaptchaVerifier.clear();
+  } catch {
+    // Ignore cleanup failures for already-destroyed reCAPTCHA widgets.
+  }
+
+  phoneRecaptchaVerifier = null;
 }
