@@ -10,6 +10,7 @@ import {
   createManagedMember,
   createVolunteerAssignment,
   deleteAnnouncement,
+  deleteManagedMember,
   deleteEvent,
   deletePrayerRequest,
   deleteVolunteerAssignment,
@@ -64,7 +65,7 @@ import type {
   VolunteerAssignment,
 } from './types';
 
-type ViewKey = 'overview' | 'approvals' | 'members' | 'planning' | 'updates' | 'churches' | 'roles';
+type ViewKey = 'overview' | 'approvals' | 'members' | 'planning' | 'updates' | 'churches' | 'roles' | 'help';
 
 type CommonMeetingOccurrence = {
   key: string;
@@ -178,6 +179,7 @@ const navigation = [
   { key: 'updates', label: 'Announcements and Events' },
   { key: 'churches', label: 'Churches And Teams' },
   { key: 'roles', label: 'Role Matrix' },
+  { key: 'help', label: 'Help' },
 ] as const;
 
 const viewTitle: Record<ViewKey, string> = {
@@ -188,6 +190,7 @@ const viewTitle: Record<ViewKey, string> = {
   updates: 'Announcements and Events',
   churches: 'Churches And Teams',
   roles: 'Role Matrix',
+  help: 'Help',
 };
 
 const viewSummary: Record<ViewKey, string> = {
@@ -198,7 +201,122 @@ const viewSummary: Record<ViewKey, string> = {
   updates: 'Publish local announcements and manage church-specific and common events for the selected church.',
   churches: 'Add church locations, keep church details current, and review each church team structure.',
   roles: 'Review the permission model for super admins, church admins, pastors, team leaders, volunteers, and members.',
+  help: 'Understand how the admin workspace works, what each section controls, and the safest workflows for daily church operations.',
 };
+
+const adminHelpSections = [
+  {
+    kicker: 'Getting started',
+    title: 'What this admin dashboard is for',
+    body: 'Bethel Admin Connect is the operating workspace for church onboarding, member management, Sunday planning, prayer moderation, announcements, events, and church setup. Everything follows the selected church scope unless you are working with a common network event.',
+    bullets: [
+      'Use Overview for a quick operational picture of the selected church.',
+      'Use Approval Queue for new member requests and prayer moderation.',
+      'Use Members to manage approved members, roles, teams, and email details.',
+      'Use Team Planning to plan Sunday service roles, assign one person per role, and review archived Sundays.',
+      'Use Announcements and Events to publish communication and manage church-specific or common events.',
+      'Use Churches And Teams to maintain church contact details, meeting times, and ministry structure.',
+    ],
+  },
+  {
+    kicker: 'Daily workflow',
+    title: 'Recommended order for normal admin work',
+    body: 'A clean daily workflow keeps the system accurate and avoids duplicate work.',
+    bullets: [
+      'Start in Overview to check the next upcoming event, approvals waiting, prayer requests, and member follow-up.',
+      'Open Approval Queue next to review new access requests and prayer requests that need moderation.',
+      'Move to Members to confirm approved people have the correct role, team access, and email address.',
+      'Use Team Planning to confirm Sunday assignments and archive history.',
+      'Finish in Announcements and Events to publish updates, meetings, and event changes for members.',
+    ],
+  },
+  {
+    kicker: 'Approvals',
+    title: 'How approvals and prayer moderation work',
+    body: 'Approval Queue combines onboarding and moderated prayer flow so admins can handle both in one place.',
+    bullets: [
+      'Access requests are routed by the church selected by the member in the user app.',
+      'Approving a request creates approved member access. Role elevation can then be handled in Members.',
+      'Prayer requests appear in their own moderation tile below approvals.',
+      'Super Admins and Church Admins can approve, hide, or remove prayer requests.',
+      'Once a prayer request is approved, it appears on the Prayer Wall for members in that church.',
+    ],
+  },
+  {
+    kicker: 'Members',
+    title: 'How member management works',
+    body: 'Members is the place to maintain approved people after access is granted.',
+    bullets: [
+      'Use search and filters to narrow members by name, role, team, and readiness.',
+      'Use Edit on a member tile to update email, role, and team assignments together.',
+      'Managed members can also be created directly from this section when needed.',
+      'Roles control permission level. Teams control planning visibility and service participation.',
+      'For security, approval only grants member access by default. Elevated roles should be assigned here intentionally.',
+    ],
+  },
+  {
+    kicker: 'Sunday planning',
+    title: 'How Sunday planning should be used',
+    body: 'Team Planning is designed to assign one person per role for each Sunday activity.',
+    bullets: [
+      'Set up teams and roles first in Team Setup.',
+      'Use the Sunday service order to decide the activity flow.',
+      'Open the activity planner for a Sunday and assign one person per role slot.',
+      'Confirm activity plan once. The system now prevents duplicate requests for the same person in the same role.',
+      'If a person is reassigned or an assignment is removed, the member flow is updated accordingly.',
+      'Use Archived Sundays to load previous Sundays and compare service history.',
+    ],
+  },
+  {
+    kicker: 'Updates',
+    title: 'How announcements and events are structured',
+    body: 'Announcements and Events handles both communication and meetings.',
+    bullets: [
+      'Announcements can be published for a set duration or until a chosen date.',
+      'Expired announcements are automatically hidden from the user app.',
+      'Events can be published as common Bethel events or church-specific events.',
+      'Common events appear across all churches. Church-specific events appear only for the selected church.',
+      'Default meetings and Sunday service also flow into the user calendar and can be deleted per instance when needed.',
+      'Published items can be deleted from the lower management tiles.',
+    ],
+  },
+  {
+    kicker: 'Church setup',
+    title: 'What belongs in Churches And Teams',
+    body: 'Churches And Teams keeps the structural data accurate for both admin and user apps.',
+    bullets: [
+      'Maintain church name, display city, address, service time, map label, and contact details here.',
+      'Social links and support contacts entered here flow into the user app experience.',
+      'Team structure in this area supports planning, member assignment, and event scoping.',
+      'If the church service time changes, related Sunday service calendar behavior updates from this source.',
+    ],
+  },
+  {
+    kicker: 'Permissions',
+    title: 'Who can do what',
+    body: 'The dashboard behavior depends on the signed-in admin role.',
+    bullets: [
+      'Super Admin has cross-church visibility and full control.',
+      'Church Admin manages approvals, members, planning, events, prayer moderation, and church setup for their church.',
+      'Pastor can assist with member and planning workflows where permitted, but not every destructive moderation action.',
+      'Team Leader is limited to their teams in planning-related areas.',
+      'The Role Matrix page is a reference guide only. Real enforcement is handled by the app logic and Firestore rules.',
+    ],
+  },
+  {
+    kicker: 'Good practice',
+    title: 'Safe and effective admin habits',
+    body: 'A few habits make the workspace much more reliable.',
+    bullets: [
+      'Use one selected church scope at a time to avoid cross-church confusion.',
+      'Review member roles after approval instead of assuming request data is enough.',
+      'Avoid repeated clicking on publish or confirm actions while a save is in progress.',
+      'Use archive comparison when reusing older Sunday patterns.',
+      'Delete outdated announcements and expired event instances to keep the member experience clean.',
+      'If something looks stale, refresh the page after major changes so the latest subscription state is visible.',
+    ],
+  },
+] as const;
 
 const defaultTeams = ['Sunday School Team', 'Worship Team', 'Speakers Team', 'Food Team', 'Tech Team'] as const;
 
@@ -1136,7 +1254,7 @@ function App() {
   const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'unassigned-team'>('all');
   const [memberSortKey, setMemberSortKey] = useState<'name' | 'role' | 'team' | 'status'>('name');
   const [memberEditId, setMemberEditId] = useState<string | null>(null);
-  const [memberEditDrafts, setMemberEditDrafts] = useState<Record<string, { roleKey: RoleKey; teamNames: string[] }>>({});
+  const [memberEditDrafts, setMemberEditDrafts] = useState<Record<string, { email: string; roleKey: RoleKey; teamNames: string[] }>>({});
   const [newTeamName, setNewTeamName] = useState('');
   const [newRoleForm, setNewRoleForm] = useState<{ teamName: string; roleName: string }>({ teamName: defaultTeams[1], roleName: '' });
   const [expandedTeamName, setExpandedTeamName] = useState<string>('');
@@ -1277,6 +1395,7 @@ function App() {
   const canModeratePrayer = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
   const canManageCommonMeetings = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
   const canManageMembers = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canDeleteMembers = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
   const canEditChurch = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
   const canPublishUpdates = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canPublishEvents = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
@@ -1717,9 +1836,9 @@ function App() {
 
     try {
       if (isFirebaseConfigured) {
-        await Promise.all(
-          requestsToUpdate.map((request) => updateAccessRequestStatus(request, nextStatus, request.requestedRoles)),
-        );
+          await Promise.all(
+            requestsToUpdate.map((request) => updateAccessRequestStatus(request, nextStatus)),
+          );
       }
       const requestIds = new Set(requestsToUpdate.map((request) => request.id));
       setAccessRequests((current) => current.map((request) => requestIds.has(request.id) ? { ...request, status: nextStatus } : request));
@@ -1836,6 +1955,7 @@ function App() {
     setMemberEditDrafts((current) => ({
       ...current,
       [member.id]: {
+        email: member.email,
         roleKey: member.roleKey,
         teamNames: member.teamNames,
       },
@@ -1853,11 +1973,17 @@ function App() {
     }
 
     try {
+      const normalizedEmail = draft.email.trim().toLowerCase();
+      if (!normalizedEmail) {
+        setUpdateMessage('Add a valid email address before saving the member.');
+        return;
+      }
       const effectiveRole = normalizeMemberRole(draft.roleKey, draft.teamNames);
       if (isFirebaseConfigured) {
         await updateMemberAssignments({
           memberId: member.id,
           churchId: member.churchId,
+          email: normalizedEmail,
           roleKey: effectiveRole,
           teamNames: draft.teamNames,
         });
@@ -1865,7 +1991,7 @@ function App() {
       setMembers((current) =>
         current.map((currentMember) =>
           currentMember.id === member.id
-            ? { ...currentMember, roleKey: effectiveRole, teamName: draft.teamNames[0] ?? '', teamNames: draft.teamNames }
+            ? { ...currentMember, email: normalizedEmail, roleKey: effectiveRole, teamName: draft.teamNames[0] ?? '', teamNames: draft.teamNames }
             : currentMember,
         ),
       );
@@ -1876,11 +2002,68 @@ function App() {
         entityType: 'member',
         actionLabel: 'Updated member',
         targetLabel: member.fullName,
-        summary: `${adminSession?.email ?? 'Church admin'} changed the member role to ${roleLabels[effectiveRole]} and updated team assignments.`,
+        summary: `${adminSession?.email ?? 'Church admin'} updated the member email, role, and team assignments.`,
         actor: adminSession?.email ?? 'Church admin',
       });
     } catch (error) {
       setUpdateMessage(error instanceof Error ? error.message : 'Unable to save the member update.');
+    }
+  };
+
+  const canDeleteMemberRecord = (member: MemberRecord) => {
+    if (!canDeleteMembers || member.id === adminSession?.uid) {
+      return false;
+    }
+
+    if (adminProfile.roleKey === 'networkSuperAdmin') {
+      return true;
+    }
+
+    return member.roleKey !== 'networkSuperAdmin' && member.roleKey !== 'churchAdmin';
+  };
+
+  const handleDeleteMember = async (member: MemberRecord) => {
+    if (!canDeleteMembers) {
+      setUpdateMessage('Only super admins and church admins can delete members.');
+      return;
+    }
+
+    if (member.id === adminSession?.uid) {
+      setUpdateMessage('You cannot delete your own admin profile from the members list.');
+      return;
+    }
+
+    if (!canDeleteMemberRecord(member)) {
+      setUpdateMessage('Church admins can delete member records, but not church admin or super admin profiles.');
+      return;
+    }
+
+    try {
+      if (isFirebaseConfigured) {
+        await deleteManagedMember(member.id);
+      }
+
+      setMembers((current) => current.filter((currentMember) => currentMember.id !== member.id));
+      setMemberEditDrafts((current) => {
+        const nextDrafts = { ...current };
+        delete nextDrafts[member.id];
+        return nextDrafts;
+      });
+      if (memberEditId === member.id) {
+        setMemberEditId(null);
+      }
+
+      setUpdateMessage(`${member.fullName} has been removed and will no longer have member access.`);
+      await appendAuditEntry({
+        churchId: member.churchId,
+        entityType: 'member',
+        actionLabel: 'Deleted member',
+        targetLabel: member.fullName,
+        summary: `${adminSession?.email ?? 'Church admin'} deleted the member profile and removed access to the member area.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+    } catch (error) {
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to delete the member.');
     }
   };
 
@@ -2199,11 +2382,25 @@ function App() {
       const nextAssignments = [
         ...scopedAssignments.filter((assignment) => !assignmentsToDelete.some((deletedAssignment) => deletedAssignment.id === assignment.id)),
         ...createdAssignments,
-      ];
+      ].reduce<VolunteerAssignment[]>((uniqueAssignments, assignment) => {
+        if (uniqueAssignments.some((currentAssignment) => currentAssignment.id === assignment.id)) {
+          return uniqueAssignments;
+        }
+
+        uniqueAssignments.push(assignment);
+        return uniqueAssignments;
+      }, []);
       setAssignments((current) => [
         ...current.filter((assignment) => !assignmentsToDelete.some((deletedAssignment) => deletedAssignment.id === assignment.id)),
         ...createdAssignments,
-      ].sort((left, right) => left.serviceDate.localeCompare(right.serviceDate) || left.assignedTo.localeCompare(right.assignedTo)));
+      ].reduce<VolunteerAssignment[]>((uniqueAssignments, assignment) => {
+        if (uniqueAssignments.some((currentAssignment) => currentAssignment.id === assignment.id)) {
+          return uniqueAssignments;
+        }
+
+        uniqueAssignments.push(assignment);
+        return uniqueAssignments;
+      }, []).sort((left, right) => left.serviceDate.localeCompare(right.serviceDate) || left.assignedTo.localeCompare(right.assignedTo)));
       setPlanningBaselineSignature(buildPlanningConflictSignature(nextAssignments, planningForm.serviceDate, selectedPlanningRequirements));
       setUpdateMessage(`Confirmed ${selectedPlanningActivity.label} for ${formatServiceDate(planningForm.serviceDate)}.`);
       await appendAuditEntry({
@@ -3155,7 +3352,7 @@ function App() {
               </div>
               <div className="member-grid">
                 {visibleMemberRecords.map((member) => {
-                  const memberDraft = memberEditDrafts[member.id] ?? { roleKey: member.roleKey, teamNames: member.teamNames };
+                  const memberDraft = memberEditDrafts[member.id] ?? { email: member.email, roleKey: member.roleKey, teamNames: member.teamNames };
                   const isEditing = memberEditId === member.id;
                   return (
                     <article key={member.id} className="member-tile">
@@ -3167,7 +3364,28 @@ function App() {
                             <span className="mini-chip">{getMemberStatusLabel(member)}</span>
                           </div>
                         </div>
-                        {canManageMembers ? <button type="button" className="member-edit-button" onClick={() => handleStartMemberEdit(member)}>Edit</button> : null}
+                        {canManageMembers ? (
+                          <div className="member-card-actions">
+                            <button type="button" className="member-edit-button" onClick={() => handleStartMemberEdit(member)}>Edit</button>
+                            {canDeleteMembers ? (
+                              <button
+                                type="button"
+                                className="action-button reject compact-action"
+                                onClick={() => void handleDeleteMember(member)}
+                                disabled={!canDeleteMemberRecord(member)}
+                                title={
+                                  member.id === adminSession?.uid
+                                    ? 'You cannot delete your own admin profile.'
+                                    : !canDeleteMemberRecord(member)
+                                      ? 'Church admins cannot delete church admin or super admin profiles.'
+                                      : undefined
+                                }
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="member-meta-list">
                         <div className="member-meta-item">
@@ -3181,6 +3399,22 @@ function App() {
                       </div>
                       {isEditing ? (
                         <div className="member-edit-panel">
+                          <div className="member-edit-group">
+                            <strong>Email</strong>
+                            <input
+                              className="auth-input"
+                              type="email"
+                              value={memberDraft.email}
+                              onChange={(event) => setMemberEditDrafts((current) => ({
+                                ...current,
+                                [member.id]: {
+                                  ...memberDraft,
+                                  email: event.target.value,
+                                },
+                              }))}
+                              placeholder="member@example.com"
+                            />
+                          </div>
                           <div className="member-edit-group">
                             <strong>Role</strong>
                             <div className="chip-row selection-chip-grid">
@@ -3925,6 +4159,20 @@ function App() {
         ) : null}
 
         {activeView === 'roles' ? <section className="dashboard-grid">{roleMatrix.map((item) => <article key={item.role} className="role-card"><p className="panel-kicker">Permission design</p><h3>{item.role}</h3><p className="detail-copy">{item.summary}</p></article>)}</section> : null}
+        {activeView === 'help' ? (
+          <section className="dashboard-grid help-layout">
+            {adminHelpSections.map((section) => (
+              <article key={section.title} className="wide-card help-card">
+                <p className="panel-kicker">{section.kicker}</p>
+                <h3>{section.title}</h3>
+                <p className="detail-copy">{section.body}</p>
+                <div className="help-bullet-list">
+                  {section.bullets.map((bullet) => <p key={bullet} className="help-bullet-item">{bullet}</p>)}
+                </div>
+              </article>
+            ))}
+          </section>
+        ) : null}
       </main>
     </div>
   );
@@ -3935,7 +4183,7 @@ export default App;
 function OfficialSignature() {
   return (
     <div className="official-signature" aria-label="Official church signature">
-      <img className="official-logo-image" src="/official-church-logo.jpg" alt="Bethel International Pentecostal Church" />
+      <img className="official-logo-image" src={`${import.meta.env.BASE_URL}official-church-logo.jpg`} alt="Bethel International Pentecostal Church" />
     </div>
   );
 }

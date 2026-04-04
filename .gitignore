@@ -1,6 +1,7 @@
 **/node_modules/
 **/.expo/
 **/dist/
+hosting/
 functions/lib/
 **/web-build/
 **/.DS_Store
@@ -28,3 +29,5 @@ functions/lib/
 credentials.json
 token.json
 firebase-debug.log
+**/google-services.json
+**/GoogleService-Info.plist

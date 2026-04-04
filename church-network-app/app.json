@@ -2,9 +2,13 @@
   "expo": {
     "name": "Bethel Connect",
     "slug": "bethel-connect",
+    "scheme": [
+      "bethelconnect",
+      "org.bethelpentecostal.bethelconnect"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/official-church-app-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -15,19 +19,31 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "org.bethelpentecostal.bethelconnect",
+      "googleServicesFile": "./google-services.json",
+      "scheme": [
+        "bethelconnect",
+        "org.bethelpentecostal.bethelconnect"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#FBF7EF",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/official-church-app-icon.png",
+        "monochromeImage": "./assets/official-church-app-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/official-church-app-icon.png"
     },
     "plugins": [
-      "expo-notifications"
-    ]
+      "expo-notifications",
+      "@react-native-google-signin/google-signin"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6cdec2ce-d6fa-4321-bd57-aee63e110317"
+      }
+    },
+    "owner": "naveenjoe180"
   }
 }

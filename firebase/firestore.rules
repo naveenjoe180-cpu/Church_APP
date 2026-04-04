@@ -21,6 +21,12 @@ service cloud.firestore {
       return approvalStatus() == "approved";
     }
 
+    function pendingChurchId() {
+      return hasUserDoc() && currentUser().data.pendingChurchId is string
+        ? currentUser().data.pendingChurchId
+        : "";
+    }
+
     function hasRole(roleKey) {
       return hasUserDoc() && roleKey in currentUser().data.roleFlags && currentUser().data.roleFlags[roleKey] == true;
     }
@@ -55,6 +61,89 @@ service cloud.firestore {
         || (hasRole("teamLeader") && belongsToChurch(churchId) && belongsToTeam(teamId));
     }
 
+    function targetHasRole(userData, roleKey) {
+      return userData.roleFlags is map
+        && roleKey in userData.roleFlags
+        && userData.roleFlags[roleKey] == true;
+    }
+
+    function canDeleteManagedUser(uid, userData) {
+      return request.auth.uid != uid
+        && (
+          isNetworkSuperAdmin()
+          || (
+            userData.primaryChurchId is string
+            && isChurchAdmin(userData.primaryChurchId)
+            && !targetHasRole(userData, "networkSuperAdmin")
+            && !targetHasRole(userData, "churchAdmin")
+          )
+        );
+    }
+
+    function isSafeSelfUserCreate(uid) {
+      return request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.primaryChurchId is string
+        && request.resource.data.pendingChurchId is string
+        && request.resource.data.primaryChurchId == request.resource.data.pendingChurchId
+        && request.resource.data.approvalStatus == "pending"
+        && request.resource.data.roleFlags is map
+        && request.resource.data.roleFlags.keys().hasOnly(["member"])
+        && request.resource.data.roleFlags.member == true
+        && request.resource.data.churchAccess is map
+        && request.resource.data.churchAccess.keys().size() == 0
+        && request.resource.data.teamAccess is map
+        && request.resource.data.teamAccess.keys().size() == 0;
+    }
+
+    function isSafeSelfUserUpdate(uid) {
+      return request.auth.uid == uid
+        && resource.data.uid == uid
+        && resource.data.approvalStatus != "approved"
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "displayName",
+          "photoUrl",
+          "phoneNumber",
+          "primaryChurchId",
+          "pendingChurchId",
+          "updatedAt"
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.approvalStatus == resource.data.approvalStatus
+        && request.resource.data.roleFlags == resource.data.roleFlags
+        && request.resource.data.churchAccess == resource.data.churchAccess
+        && request.resource.data.teamAccess == resource.data.teamAccess
+        && request.resource.data.primaryChurchId is string
+        && request.resource.data.pendingChurchId is string
+        && request.resource.data.primaryChurchId == request.resource.data.pendingChurchId;
+    }
+
+    function hasValidNotificationChurchIds(churchIds) {
+      return churchIds is list
+        && churchIds.size() <= 1
+        && (
+          churchIds.size() == 0
+          || belongsToChurch(churchIds[0])
+          || churchIds[0] == pendingChurchId()
+        );
+    }
+
+    function isSafeAccessRequestCreate() {
+      return request.resource.data.uid == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.fullName is string
+        && request.resource.data.requestedChurchId is string
+        && request.resource.data.churchId == request.resource.data.requestedChurchId
+        && request.resource.data.status == "pending"
+        && request.resource.data.signInMethod == "google"
+        && request.resource.data.requestedRoles is list
+        && request.resource.data.requestedRoles.size() == 1
+        && request.resource.data.requestedRoles[0] == "member";
+    }
+
     match /churches/{churchId} {
       allow read: if resource.data.isPublic == true || (isApproved() && belongsToChurch(churchId)) || isNetworkSuperAdmin();
       allow write: if isChurchAdmin(churchId);
@@ -68,7 +157,7 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow create: if isSignedIn() && (
-        request.auth.uid == uid
+        isSafeSelfUserCreate(uid)
         || isNetworkSuperAdmin()
         || (
           request.resource.data.primaryChurchId is string
@@ -88,7 +177,7 @@ service cloud.firestore {
         )
       );
       allow update: if isSignedIn() && (
-        request.auth.uid == uid
+        isSafeSelfUserUpdate(uid)
         || isNetworkSuperAdmin()
         || (
           resource != null
@@ -100,7 +189,9 @@ service cloud.firestore {
           && isChurchAdmin(request.resource.data.primaryChurchId)
         )
       );
-      allow delete: if isNetworkSuperAdmin();
+      allow delete: if isSignedIn()
+        && resource != null
+        && canDeleteManagedUser(uid, resource.data);
     }
 
     match /userPrivateProfiles/{uid} {
@@ -116,15 +207,20 @@ service cloud.firestore {
           )
         )
       );
-      allow write: if isSignedIn() && (
-        request.auth.uid == uid
-        || isNetworkSuperAdmin()
-        || isChurchAdmin(request.resource.data.primaryChurchId)
+      allow create, update: if isSignedIn() && (
+        isNetworkSuperAdmin()
+        || (
+          request.resource.data.primaryChurchId is string
+          && isChurchAdmin(request.resource.data.primaryChurchId)
+        )
       );
+      allow delete: if isSignedIn()
+        && resource != null
+        && canDeleteManagedUser(uid, resource.data);
     }
 
     match /accessRequests/{requestId} {
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() && isSafeAccessRequestCreate();
       allow read: if isSignedIn() && (
         resource.data.uid == request.auth.uid
         || isNetworkSuperAdmin()
@@ -150,20 +246,10 @@ service cloud.firestore {
       allow create, update: if isSignedIn() && (
         isNetworkSuperAdmin()
         || isChurchAdmin(request.resource.data.scopeChurchId)
-        || (
-          request.resource.data.scopeChurchId is string
-          && request.resource.data.scopeTeamId is string
-          && isTeamLeader(request.resource.data.scopeChurchId, request.resource.data.scopeTeamId)
-        )
       );
       allow delete: if isSignedIn() && (
         isNetworkSuperAdmin()
         || isChurchAdmin(resource.data.scopeChurchId)
-        || (
-          resource.data.scopeChurchId is string
-          && resource.data.scopeTeamId is string
-          && isTeamLeader(resource.data.scopeChurchId, resource.data.scopeTeamId)
-        )
       );
     }
 
@@ -184,10 +270,6 @@ service cloud.firestore {
           && isAnyChurchAdmin()
         )
         || isChurchAdmin(request.resource.data.churchId)
-        || (
-          request.resource.data.teamId is string
-          && isTeamLeader(request.resource.data.churchId, request.resource.data.teamId)
-        )
       );
       allow delete: if isSignedIn() && (
         isNetworkSuperAdmin()
@@ -196,10 +278,6 @@ service cloud.firestore {
           && isAnyChurchAdmin()
         )
         || isChurchAdmin(resource.data.churchId)
-        || (
-          resource.data.teamId is string
-          && isTeamLeader(resource.data.churchId, resource.data.teamId)
-        )
       );
     }
 
@@ -339,7 +417,15 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid
         || isNetworkSuperAdmin()
       );
-      allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create, update: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.channel == "expo"
+        && request.resource.data.token is string
+        && request.resource.data.permissionState is string
+        && request.resource.data.deviceLabel is string
+        && request.resource.data.enabled == true
+        && request.resource.data.approvalStatus == approvalStatus()
+        && hasValidNotificationChurchIds(request.resource.data.churchIds);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 

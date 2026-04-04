@@ -12,7 +12,7 @@ type RegistrationContext = {
   uid: string;
   email: string;
   displayName: string;
-  churchIds: string[];
+  churchId: string;
   approvalStatus: 'pending' | 'approved' | 'rejected' | 'profile';
 };
 
@@ -46,7 +46,7 @@ async function upsertNotificationDevice(
       userId: context.uid,
       email: context.email,
       displayName: context.displayName,
-      churchIds: context.churchIds,
+      churchIds: context.churchId ? [context.churchId] : [],
       approvalStatus: context.approvalStatus,
       channel: payload.channel,
       token: payload.token,
@@ -66,9 +66,8 @@ async function registerExpoNotifications(context: RegistrationContext): Promise<
     return { status: 'needs-config', message: 'Add EXPO_PUBLIC_EXPO_PROJECT_ID before enabling mobile push notifications.' };
   }
 
-  const nativeRequire = eval('require') as NodeRequire;
-  const Device = nativeRequire('expo-device');
-  const Notifications = nativeRequire('expo-notifications');
+  const Device = await import('expo-device');
+  const Notifications = await import('expo-notifications');
 
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -121,7 +120,7 @@ export async function registerMemberNotifications(context: RegistrationContext) 
 
   const normalizedContext = {
     ...context,
-    churchIds: [...new Set(context.churchIds.filter(Boolean))],
+    churchId: context.churchId.trim(),
   };
   return registerExpoNotifications(normalizedContext);
 }

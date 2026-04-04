@@ -1,4 +1,4 @@
-import { doc, onSnapshot, serverTimestamp, setDoc, type FirestoreError } from 'firebase/firestore';
+import { doc, onSnapshot, type FirestoreError } from 'firebase/firestore';
 
 import { firestoreDb } from '../config/firebase';
 
@@ -135,38 +135,5 @@ export function subscribeToMemberProfile(
     (error) => {
       onError?.(normalizeError(error, 'Unable to load the member approval status.'));
     },
-  );
-}
-
-export async function saveMemberPhoneVerificationPending(uid: string, phoneNumber: string) {
-  if (!firestoreDb) {
-    throw new Error('Firebase is not configured for the member app.');
-  }
-
-  await setDoc(
-    doc(firestoreDb, 'users', uid),
-    {
-      phoneNumber: phoneNumber.trim() || null,
-      phoneVerificationStatus: phoneNumber.trim() ? 'pending' : 'missing',
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
-}
-
-export async function markMemberPhoneVerified(uid: string, phoneNumber: string) {
-  if (!firestoreDb) {
-    throw new Error('Firebase is not configured for the member app.');
-  }
-
-  await setDoc(
-    doc(firestoreDb, 'users', uid),
-    {
-      phoneNumber: phoneNumber.trim(),
-      phoneVerificationStatus: 'verified',
-      phoneVerifiedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
   );
 }

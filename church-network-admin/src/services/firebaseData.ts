@@ -96,7 +96,7 @@ function mapAccessRequest(id: string, rawValue: Record<string, unknown>): Access
         : typeof rawValue.requestedChurchId === 'string'
           ? rawValue.requestedChurchId
           : '',
-    requestedRoles: normalizeRoles(rawValue.requestedRoles),
+    requestedRoles: ['member'],
     note: typeof rawValue.note === 'string' ? rawValue.note : typeof rawValue.notes === 'string' ? rawValue.notes : '',
     requestedAt: normalizeTimestamp((rawValue.createdAt as Timestamp | null | undefined) ?? (rawValue.requestedAt as Timestamp | string | null | undefined)),
     status:
@@ -679,13 +679,12 @@ export async function writeAuditEntry(payload: {
 export async function updateAccessRequestStatus(
   request: AccessRequest,
   nextStatus: 'approved' | 'rejected',
-  requestedRoles: RoleKey[],
 ) {
   if (!firestoreDb) {
     throw new Error('Firebase is not configured for the admin dashboard.');
   }
 
-  const nextRoles = [...new Set<RoleKey>(['member', ...requestedRoles])];
+  const nextRoles: RoleKey[] = ['member'];
   const accessRequestRef = doc(firestoreDb, 'accessRequests', request.id);
 
   if (!request.uid) {
@@ -755,6 +754,7 @@ export async function deletePrayerRequest(requestId: string) {
 export async function updateMemberAssignments(payload: {
   memberId: string;
   churchId: string;
+  email: string;
   roleKey: RoleKey;
   teamNames: string[];
 }) {
@@ -778,8 +778,14 @@ export async function updateMemberAssignments(payload: {
     return flags;
   }, {});
   const effectiveRole = getEffectiveRole({ [payload.roleKey]: true }, payload.teamNames);
+  const normalizedEmail = payload.email.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    throw new Error('Add a valid email address before saving the member.');
+  }
 
   await updateDoc(userRef, {
+    email: normalizedEmail,
     approvalStatus: 'approved',
     primaryChurchId: payload.churchId,
     primaryTeamName: payload.teamNames[0] || null,
@@ -793,6 +799,17 @@ export async function updateMemberAssignments(payload: {
     ...(payload.teamNames.length > 0 ? buildNestedBooleanFields('teamAccess', payload.teamNames) : {}),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deleteManagedMember(memberId: string) {
+  if (!firestoreDb) {
+    throw new Error('Firebase is not configured for the admin dashboard.');
+  }
+
+  const batch = writeBatch(firestoreDb);
+  batch.delete(doc(firestoreDb, 'users', memberId));
+  batch.delete(doc(firestoreDb, 'userPrivateProfiles', memberId));
+  await batch.commit();
 }
 
 export async function createManagedMember(payload: {
@@ -839,7 +856,8 @@ export async function createVolunteerAssignment(payload: {
     throw new Error('Firebase is not configured for the admin dashboard.');
   }
 
-  const newAssignmentRef = await addDoc(collection(firestoreDb, 'scheduleAssignments'), {
+  const assignmentId = buildVolunteerAssignmentId(payload);
+  await setDoc(doc(firestoreDb, 'scheduleAssignments', assignmentId), {
     churchId: payload.churchId,
     teamId: payload.teamName,
     teamName: payload.teamName,
@@ -851,9 +869,9 @@ export async function createVolunteerAssignment(payload: {
     createdBy: payload.createdBy,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  }, { merge: true });
 
-  return newAssignmentRef.id;
+  return assignmentId;
 }
 
 export async function deleteVolunteerAssignment(assignmentId: string) {
@@ -870,6 +888,24 @@ function slugifyChurchId(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+function buildVolunteerAssignmentId(payload: {
+  churchId: string;
+  teamName: string;
+  roleName: string;
+  serviceDate: string;
+  assignedTo: string;
+  assignedUserId?: string;
+}) {
+  const assigneeKey = payload.assignedUserId?.trim().toLowerCase() || payload.assignedTo.trim().toLowerCase();
+  return [
+    payload.churchId,
+    payload.serviceDate,
+    payload.teamName,
+    payload.roleName,
+    assigneeKey,
+  ].map(slugifyChurchId).join('__');
 }
 
 export async function createChurchLocation(payload: {

@@ -1,19 +1,17 @@
 import {
   GoogleAuthProvider,
-  PhoneAuthProvider,
-  RecaptchaVerifier,
-  createUserWithEmailAndPassword,
   onAuthStateChanged,
-  signInWithEmailAndPassword,
+  signInWithCredential,
   signInWithPopup,
   signOut,
-  updatePhoneNumber,
   updateProfile,
   type User,
 } from 'firebase/auth';
 import { Platform } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import { firebaseAuth } from '../config/firebase';
+import { googleAuthConfig } from '../config/firebase';
 
 export type AuthSession = {
   uid: string;
@@ -22,8 +20,6 @@ export type AuthSession = {
   photoUrl: string;
   providerId: string;
 };
-
-let phoneRecaptchaVerifier: RecaptchaVerifier | null = null;
 
 function mapUser(user: User): AuthSession {
   if (!user.email) {
@@ -64,44 +60,48 @@ export async function signInWithGoogle() {
   }
 
   if (Platform.OS !== 'web') {
-    throw new Error('Google sign-in is currently enabled for the web prototype first.');
+    GoogleSignin.configure({
+      webClientId: googleAuthConfig.webClientId || undefined,
+    });
+
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    const nativeResponse = await GoogleSignin.signIn();
+
+    if (nativeResponse.type !== 'success') {
+      throw new Error('Google sign-in was cancelled before it completed.');
+    }
+
+    const idToken = nativeResponse.data.idToken ?? (await GoogleSignin.getTokens()).idToken;
+    if (!idToken) {
+      throw new Error('Google sign-in did not return a valid ID token.');
+    }
+
+    const credential = GoogleAuthProvider.credential(idToken);
+    await signInWithCredential(firebaseAuth, credential);
+    return mapCurrentUser();
   }
 
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
+  if (typeof signInWithPopup !== 'function') {
+    throw new Error('Native Google sign-in is not configured in this build yet.');
+  }
+
   await signInWithPopup(firebaseAuth, provider);
   return mapCurrentUser();
 }
 
-export async function createEmailAccount(email: string, password: string) {
+export async function signInWithGoogleCredential(idToken: string, accessToken?: string) {
   if (!firebaseAuth) {
     throw new Error('Firebase is not configured for the member app.');
   }
 
-  try {
-    await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
-  } catch (error) {
-    if (
-      typeof error === 'object'
-      && error !== null
-      && 'code' in error
-      && error.code === 'auth/email-already-in-use'
-    ) {
-      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
-    } else {
-      throw error;
-    }
+  if (!idToken) {
+    throw new Error('Google sign-in did not return a valid ID token.');
   }
 
-  return mapCurrentUser();
-}
-
-export async function signInEmailAccount(email: string, password: string) {
-  if (!firebaseAuth) {
-    throw new Error('Firebase is not configured for the member app.');
-  }
-
-  await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+  const credential = GoogleAuthProvider.credential(idToken, accessToken);
+  await signInWithCredential(firebaseAuth, credential);
   return mapCurrentUser();
 }
 
@@ -125,78 +125,13 @@ export async function signOutMember() {
     return;
   }
 
-  await signOut(firebaseAuth);
-}
-
-function requirePhoneVerificationSupport() {
-  if (!firebaseAuth) {
-    throw new Error('Firebase is not configured for the member app.');
-  }
-
-  if (Platform.OS !== 'web' || typeof window === 'undefined') {
-    throw new Error('Phone verification is currently enabled in the web member app first.');
-  }
-}
-
-function createPhoneRecaptcha(containerId: string) {
-  requirePhoneVerificationSupport();
-
-  if (!containerId.trim()) {
-    throw new Error('Phone verification could not start because the reCAPTCHA container is missing.');
-  }
-
-  if (phoneRecaptchaVerifier) {
+  if (Platform.OS !== 'web') {
     try {
-      phoneRecaptchaVerifier.clear();
+      await GoogleSignin.signOut();
     } catch {
-      // Ignore stale reCAPTCHA instances before creating a fresh one.
+      // Keep Firebase sign-out resilient even if native Google session has already expired.
     }
   }
 
-  phoneRecaptchaVerifier = new RecaptchaVerifier(firebaseAuth!, containerId, {
-    size: 'invisible',
-  });
-
-  return phoneRecaptchaVerifier;
-}
-
-export async function sendMemberPhoneVerificationCode(phoneNumber: string, containerId: string) {
-  requirePhoneVerificationSupport();
-
-  if (!phoneNumber.trim()) {
-    throw new Error('Add your phone number before requesting the verification code.');
-  }
-
-  const provider = new PhoneAuthProvider(firebaseAuth!);
-  const recaptchaVerifier = createPhoneRecaptcha(containerId);
-  return provider.verifyPhoneNumber(phoneNumber.trim(), recaptchaVerifier);
-}
-
-export async function confirmMemberPhoneVerificationCode(verificationId: string, verificationCode: string) {
-  requirePhoneVerificationSupport();
-
-  if (!firebaseAuth?.currentUser) {
-    throw new Error('Sign in again before confirming the verification code.');
-  }
-
-  if (!verificationId.trim() || !verificationCode.trim()) {
-    throw new Error('Enter the code that was sent to your phone.');
-  }
-
-  const credential = PhoneAuthProvider.credential(verificationId.trim(), verificationCode.trim());
-  await updatePhoneNumber(firebaseAuth.currentUser, credential);
-}
-
-export function clearMemberPhoneVerificationChallenge() {
-  if (!phoneRecaptchaVerifier) {
-    return;
-  }
-
-  try {
-    phoneRecaptchaVerifier.clear();
-  } catch {
-    // Ignore cleanup failures for already-destroyed reCAPTCHA widgets.
-  }
-
-  phoneRecaptchaVerifier = null;
+  await signOut(firebaseAuth);
 }

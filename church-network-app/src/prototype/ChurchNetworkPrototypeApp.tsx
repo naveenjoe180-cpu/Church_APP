@@ -2,13 +2,17 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
+  type LayoutChangeEvent,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar as NativeStatusBar,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -62,6 +66,8 @@ import { colors } from '../theme';
 
 type AppStage = 'guest' | 'signin' | 'profile' | 'pending' | 'approved';
 type SignInMethod = 'google';
+type AppTabKey = 'explore' | 'meetings' | 'access' | 'member' | 'help';
+type PublicLinkTabKey = 'about' | 'locations' | 'connect' | 'facebook' | 'contact';
 
 type RequestForm = {
   displayName: string;
@@ -93,14 +99,37 @@ const officialLogo = require('../../assets/official-church-logo.jpg');
 
 const approvedMemberViews = [
   { key: 'home', label: 'Home' },
-  { key: 'sunday', label: 'Sunday Plan' },
+  { key: 'teamsPlans', label: 'My Teams & Plans' },
+  { key: 'announcements', label: 'Announcements' },
   { key: 'calendar', label: 'Calendar' },
   { key: 'prayer', label: 'Prayer' },
-  { key: 'prayerWall', label: 'Prayer Wall' },
-  { key: 'announcements', label: 'Announcements' },
-  { key: 'events', label: 'Events' },
-  { key: 'teams', label: 'My Teams' },
 ] as const;
+
+type MemberViewKey = (typeof approvedMemberViews)[number]['key'];
+
+const guestAppTabs = [
+  { key: 'access', label: 'Access' },
+  { key: 'explore', label: 'Explore' },
+  { key: 'meetings', label: 'Meetings' },
+  { key: 'help', label: 'Help' },
+] as const;
+
+const approvedAppTabs = [
+  { key: 'member', label: 'Member' },
+  { key: 'explore', label: 'Explore' },
+  { key: 'meetings', label: 'Meetings' },
+  { key: 'help', label: 'Help' },
+] as const;
+
+function getAvailablePublicTabs(church: NetworkChurch) {
+  return [
+    { key: 'about' as const, label: 'About Us' },
+    { key: 'locations' as const, label: 'Church Locations' },
+    church.youtubeUrl || church.instagramUrl ? { key: 'connect' as const, label: 'Connect with us' } : null,
+    church.facebookUrl ? { key: 'facebook' as const, label: 'Facebook', url: church.facebookUrl } : null,
+    church.whatsappUrl ? { key: 'contact' as const, label: 'Contact Us', url: church.whatsappUrl } : null,
+  ].filter(Boolean) as Array<{ key: PublicLinkTabKey; label: string; url?: string }>;
+}
 
 const commonMeetingCards = [
   {
@@ -239,7 +268,7 @@ const helpGuideSections = [
     title: '4. Use your approved member space',
     points: [
       'After approval, your church dashboard opens with member-only tools and church-specific content.',
-      'The approved member navigation includes Home, Sunday Plan, Calendar, Prayer, Prayer Wall, Announcements, Events, and My Teams.',
+      'The approved member navigation includes Home, My Teams & Plans, Calendar, Prayer, and Announcements.',
       'The content you see is connected to your own church, while network-wide items still remain visible where relevant.',
     ],
   },
@@ -252,10 +281,10 @@ const helpGuideSections = [
     ],
   },
   {
-    title: '6. Use Sunday Plan correctly',
+    title: '6. Use My Teams & Plans correctly',
     points: [
-      'Sunday Plan shows assignments that church leaders have prepared for you for upcoming Sundays.',
-      'Assignments are grouped by Sunday and activity so you can understand the whole ministry flow, not just a single task.',
+      'My Teams & Plans combines your team membership and your upcoming Sunday assignments in one place.',
+      'The My Sunday plan tile groups assignments by Sunday and activity so you can understand the whole ministry flow, not just a single task.',
       'If you receive an assignment, respond by accepting or declining it so leaders can finalise the service plan.',
       'If an assignment is removed or reassigned by the church, it disappears from your active response list and no longer needs action from you.',
     ],
@@ -279,11 +308,11 @@ const helpGuideSections = [
     ],
   },
   {
-    title: '9. Use Prayer and Prayer Wall',
+    title: '9. Use Prayer',
     points: [
       'Prayer lets you send a prayer request to your church and choose whether to share it anonymously.',
       'Your request appears publicly only after approval by church leadership.',
-      'Prayer Wall displays approved prayer requests for members of your church as individual tiles.',
+      'The Prayer page also includes Prayer Wall below your own prayer requests, so approved church prayer requests stay visible in the same place.',
       'Use Pray on a prayer-wall tile to mark that you prayed; this changes to Prayed for you only and is not shown to other users.',
       'You can also remove your own prayer requests, and church leadership can hide or remove moderated requests when needed.',
     ],
@@ -291,8 +320,8 @@ const helpGuideSections = [
   {
     title: '10. Follow Announcements and Events',
     points: [
-      'Announcements help you stay informed about church notices, service updates, and ministry communication.',
-      'Events provide more structured information for gatherings, special programmes, conferences, or church activities.',
+      'Announcements helps you stay informed about church notices, service updates, and ministry communication.',
+      'The Events tile now sits inside Announcements so event information appears directly below church announcements.',
       'Events can be common across all churches or specific to your own church depending on how they are published by leadership.',
       'If an event includes a poster, it appears in the event view so members can recognise and share it more easily.',
     ],
@@ -300,7 +329,7 @@ const helpGuideSections = [
   {
     title: '11. Know your teams and role',
     points: [
-      'My Teams shows the ministry teams you currently belong to and your current role in the church.',
+      'My Teams & Plans shows the ministry teams you currently belong to and your current role in the church.',
       'This section helps you understand why certain Sunday assignments are reaching you and which leaders may coordinate with you.',
       'If you are approved but no team has been assigned yet, the app keeps the space visible and explains that assignment will appear once leadership adds you.',
     ],
@@ -326,13 +355,19 @@ const helpGuideSections = [
     points: [
       'New visitor workflow: open Public church links, read About Us, review Church Locations, then sign in with Google when you are ready to request access.',
       'New member workflow: sign in, complete the church request, wait for approval, then return through Sign In for direct member access.',
-      'Weekly member workflow: check Home, review Calendar, open Sunday Plan, respond to assignments, and stay aware of announcements and events.',
-      'Prayer workflow: submit a prayer request in Prayer, then return later to Prayer Wall to stand with the church in prayer for approved needs.',
+      'Weekly member workflow: check Home, review Calendar, open My Teams & Plans, respond to assignments, and stay aware of announcements and events.',
+      'Prayer workflow: submit a prayer request in Prayer, then continue in the same Prayer page to review your requests and stand with the church in prayer for approved needs.',
     ],
   },
 ];
 
 export function ChurchNetworkPrototypeApp() {
+  const { width: viewportWidth } = useWindowDimensions();
+  const isCompactMemberHeader = viewportWidth < 560;
+  const isCompactPhoneLayout = viewportWidth < 520;
+  const compactTopDockOffset = isCompactPhoneLayout
+    ? (Platform.OS === 'android' ? (NativeStatusBar.currentHeight ?? 0) : 0) + 12
+    : 0;
   const [stage, setStage] = useState<AppStage>('guest');
   const [signInMethod, setSignInMethod] = useState<SignInMethod>('google');
   const [requestForm, setRequestForm] = useState<RequestForm>(initialForm);
@@ -362,11 +397,16 @@ export function ChurchNetworkPrototypeApp() {
   const [isSubmittingPrayerRequest, setIsSubmittingPrayerRequest] = useState(false);
   const [removingPrayerRequestId, setRemovingPrayerRequestId] = useState<string | null>(null);
   const [markingPrayerRequestId, setMarkingPrayerRequestId] = useState<string | null>(null);
+  const [activeAppTab, setActiveAppTab] = useState<AppTabKey>('explore');
+  const [activeMemberView, setActiveMemberView] = useState<MemberViewKey>('home');
+  const [activePublicTab, setActivePublicTab] = useState<PublicLinkTabKey>('about');
   const [signInSectionY, setSignInSectionY] = useState<number | null>(null);
   const [eventClock, setEventClock] = useState(() => Date.now());
   const notificationRegistrationRef = useRef<string | null>(null);
   const previousAssignmentIdsRef = useRef<string[]>([]);
   const scrollViewRef = useRef<ScrollView | null>(null);
+  const contentAnchorRef = useRef<Record<string, number>>({});
+  const pendingScrollTargetRef = useRef<string | null>(null);
 
   const activeChurchId = memberProfile?.pendingChurchId || memberProfile?.primaryChurchId || requestForm.requestedChurchId;
   const selectedChurch = useMemo(
@@ -375,12 +415,14 @@ export function ChurchNetworkPrototypeApp() {
   );
   const heroAssignments = useMemo(
     () =>
-      [...memberAssignments].sort((left, right) => {
+      [...memberAssignments]
+        .filter((assignment) => isUpcomingSundayAssignment(assignment.serviceDate, selectedChurch.serviceTimes, eventClock))
+        .sort((left, right) => {
         const leftDate = parseCalendarDate(left.serviceDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
         const rightDate = parseCalendarDate(right.serviceDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
         return leftDate - rightDate;
       }),
-    [memberAssignments],
+    [eventClock, memberAssignments, selectedChurch.serviceTimes],
   );
   const activeHeroAnnouncements = useMemo(
     () => churchAnnouncements.filter((announcement) => {
@@ -418,6 +460,69 @@ export function ChurchNetworkPrototypeApp() {
 
     return 'Member Mode';
   }, [authSession, memberProfile?.approvalStatus, memberProfile?.roleKey]);
+  const appTabs = stage === 'approved' ? approvedAppTabs : guestAppTabs;
+  const availablePublicTabs = useMemo(() => getAvailablePublicTabs(selectedChurch), [selectedChurch]);
+  const scrollViewportMarginTop = stage === 'approved'
+    ? isCompactMemberHeader
+      ? activeAppTab === 'explore' || activeAppTab === 'member'
+        ? isCompactPhoneLayout ? 214 : 284
+        : isCompactPhoneLayout ? 148 : 198
+      : activeAppTab === 'explore' || activeAppTab === 'member'
+        ? 238
+        : 152
+    : activeAppTab === 'explore'
+      ? isCompactPhoneLayout ? 146 : 178
+      : isCompactPhoneLayout ? 80 : 92;
+
+  const getCurrentAccessAnchorKey = () => {
+    if (stage === 'signin') return 'access:signin';
+    if (stage === 'profile') return 'access:profile';
+    if (stage === 'pending') return 'access:pending';
+    return 'access:guest';
+  };
+
+  const getCurrentExploreAnchorKey = () => `explore:${activePublicTab}`;
+  const getCurrentMemberAnchorKey = () => `member:${activeMemberView}`;
+
+  const scrollToAnchor = (anchorKey: string) => {
+    const anchorY = contentAnchorRef.current[anchorKey];
+    if (typeof anchorY !== 'number') {
+      pendingScrollTargetRef.current = anchorKey;
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: Math.max(0, anchorY - 10), animated: true });
+      });
+    });
+  };
+
+  const registerContentAnchor = (anchorKey: string) => (event: LayoutChangeEvent) => {
+    contentAnchorRef.current[anchorKey] = event.nativeEvent.layout.y;
+    if (pendingScrollTargetRef.current === anchorKey) {
+      pendingScrollTargetRef.current = null;
+      scrollToAnchor(anchorKey);
+    }
+  };
+
+  useEffect(() => {
+    if (!availablePublicTabs.some((item) => item.key === activePublicTab)) {
+      setActivePublicTab(availablePublicTabs[0]?.key ?? 'about');
+    }
+  }, [activePublicTab, availablePublicTabs]);
+
+  useEffect(() => {
+    if (activeAppTab === 'explore') {
+      scrollToAnchor('app:explore');
+    }
+  }, [activeAppTab, activePublicTab]);
+
+  useEffect(() => {
+    if (activeAppTab === 'member' && stage === 'approved') {
+      scrollToAnchor(`member:${activeMemberView}`);
+    }
+  }, [activeAppTab, activeMemberView, stage]);
 
   const openUrl = (url: string) => {
     void Linking.openURL(url);
@@ -525,6 +630,16 @@ export function ChurchNetworkPrototypeApp() {
 
     setStage('profile');
   }, [authSession, isSyncingAccess, memberProfile]);
+
+  useEffect(() => {
+    setActiveAppTab((current) => {
+      if (stage === 'approved') {
+        return current === 'access' ? 'member' : current;
+      }
+
+      return current === 'member' ? 'access' : current;
+    });
+  }, [stage]);
 
   useEffect(() => {
     if (stage !== 'approved' || !selectedChurch?.id) {
@@ -685,11 +800,11 @@ export function ChurchNetworkPrototypeApp() {
       uid: authSession.uid,
       email: authSession.email,
       displayName: authSession.displayName || requestForm.displayName || authSession.email,
-      churchIds: [
-        memberProfile?.pendingChurchId ?? '',
-        memberProfile?.primaryChurchId ?? '',
-        requestForm.requestedChurchId,
-      ].filter(Boolean),
+      churchId:
+        memberProfile?.pendingChurchId
+        || memberProfile?.primaryChurchId
+        || requestForm.requestedChurchId
+        || '',
       approvalStatus: memberProfile?.approvalStatus ?? 'profile',
     }).then((result) => {
       setNotificationStatusMessage(result.message);
@@ -710,10 +825,10 @@ export function ChurchNetworkPrototypeApp() {
   ]);
 
   useEffect(() => {
-    if (stage === 'signin' && signInSectionY !== null) {
+    if (activeAppTab === 'access' && stage === 'signin' && signInSectionY !== null) {
       scrollViewRef.current?.scrollTo({ y: Math.max(signInSectionY - 18, 0), animated: true });
     }
-  }, [signInSectionY, stage]);
+  }, [activeAppTab, signInSectionY, stage]);
 
   const authenticateMember = async () => {
     setValidationMessage('');
@@ -909,12 +1024,120 @@ export function ChurchNetworkPrototypeApp() {
       <StatusBar style="light" />
       <View style={[styles.glow, styles.glowTop]} />
       <View style={[styles.glow, styles.glowBottom]} />
-      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroBrandColumn}>
-              <OfficialSignature />
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.topDockLayer,
+          isCompactPhoneLayout && styles.topDockLayerCompact,
+          compactTopDockOffset > 0 && { top: compactTopDockOffset },
+        ]}
+      >
+        {stage === 'approved' ? (
+          <View style={[styles.memberHeaderStrip, isCompactMemberHeader && styles.memberHeaderStripCompact]}>
+            <View style={[styles.memberHeaderIdentity, isCompactMemberHeader && styles.memberHeaderIdentityCompact]}>
+              <Image source={officialLogo} resizeMode="contain" style={styles.memberHeaderLogo} />
+              <Text style={[styles.memberHeaderTitle, isCompactMemberHeader && styles.memberHeaderTitleCompact]} numberOfLines={isCompactMemberHeader ? 2 : 1}>
+                {selectedChurch.name}
+              </Text>
             </View>
+            <View style={[styles.memberHeaderActions, isCompactMemberHeader && styles.memberHeaderActionsCompact]}>
+              <View style={[styles.memberHeaderMemberTile, isCompactMemberHeader && styles.memberHeaderMemberTileCompact]}>
+                <Text style={[styles.memberHeaderMemberTileText, isCompactMemberHeader && styles.memberHeaderMemberTileTextCompact]} numberOfLines={1}>
+                  {requestForm.displayName || 'Member'}
+                </Text>
+              </View>
+              <View style={styles.memberHeaderModeBadge}>
+                <Text style={styles.memberHeaderModeBadgeText}>{roleModeLabel}</Text>
+              </View>
+              <Pressable onPress={resetDemo} style={styles.memberHeaderSignOutButton}>
+                <Text style={styles.memberHeaderSignOutButtonText}>Sign Out</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+        <View style={[styles.appTabDock, isCompactPhoneLayout && styles.appTabDockCompact]}>
+          {appTabs.map((item) => (
+            <Pressable
+              key={item.key}
+              onPress={() => {
+                setActiveAppTab(item.key);
+                if (item.key === 'explore') {
+                  scrollToAnchor(getCurrentExploreAnchorKey());
+                  return;
+                }
+                if (item.key === 'member') {
+                  scrollToAnchor(getCurrentMemberAnchorKey());
+                  return;
+                }
+                if (item.key === 'access') {
+                  scrollToAnchor(getCurrentAccessAnchorKey());
+                  return;
+                }
+                scrollToAnchor(`app:${item.key}`);
+              }}
+              style={[styles.appTabDockPill, isCompactPhoneLayout && styles.appTabDockPillCompact, activeAppTab === item.key && styles.appTabDockPillActive]}
+            >
+              <Text style={[styles.appTabDockPillText, isCompactPhoneLayout && styles.appTabDockPillTextCompact, activeAppTab === item.key && styles.appTabDockPillTextActive]}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {activeAppTab === 'explore' ? (
+          <View style={[styles.memberTabDock, isCompactPhoneLayout && styles.memberTabDockCompact]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.memberTabDockScroll, isCompactPhoneLayout && styles.memberTabDockScrollCompact]}>
+              {availablePublicTabs.map((item) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => {
+                    setActivePublicTab(item.key);
+                    scrollToAnchor('app:explore');
+                  }}
+                  style={[styles.memberTabDockPill, isCompactPhoneLayout && styles.memberTabDockPillCompact, activePublicTab === item.key && styles.memberTabDockPillActive]}
+                >
+                  <Text style={[styles.memberTabDockPillText, isCompactPhoneLayout && styles.memberTabDockPillTextCompact, activePublicTab === item.key && styles.memberTabDockPillTextActive]}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+        {stage === 'approved' && activeAppTab === 'member' ? (
+          <View style={[styles.memberTabDock, isCompactPhoneLayout && styles.memberTabDockCompact]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.memberTabDockScroll, isCompactPhoneLayout && styles.memberTabDockScrollCompact]}>
+              {approvedMemberViews.map((item) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => {
+                    setActiveMemberView(item.key);
+                    scrollToAnchor(`member:${item.key}`);
+                  }}
+                  style={[styles.memberTabDockPill, isCompactPhoneLayout && styles.memberTabDockPillCompact, activeMemberView === item.key && styles.memberTabDockPillActive]}
+                >
+                  <Text style={[styles.memberTabDockPillText, isCompactPhoneLayout && styles.memberTabDockPillTextCompact, activeMemberView === item.key && styles.memberTabDockPillTextActive]}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+      </View>
+      <ScrollView
+        ref={scrollViewRef}
+        style={[
+          styles.scrollViewport,
+          { marginTop: scrollViewportMarginTop + compactTopDockOffset },
+        ]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          activeAppTab === 'explore' || (stage === 'approved' && activeAppTab === 'member')
+            ? styles.scrollContentDoubleDock
+            : styles.scrollContentSingleDock,
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.hero}>
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroBrandColumn}>
+            <OfficialSignature />
+          </View>
+          {stage !== 'approved' ? (
             <View style={styles.heroModeRow}>
               <View style={styles.heroModeBadge}>
                 <Text style={styles.heroModeBadgeText}>{roleModeLabel}</Text>
@@ -926,6 +1149,7 @@ export function ChurchNetworkPrototypeApp() {
               ) : (
                 <Pressable
                   onPress={() => {
+                    setActiveAppTab('access');
                     setStage('signin');
                   }}
                   style={styles.heroSignOutButton}
@@ -934,6 +1158,7 @@ export function ChurchNetworkPrototypeApp() {
                 </Pressable>
               )}
             </View>
+          ) : null}
           </View>
           <View style={styles.heroBadgeRow}>
             <Badge label="Germany Network" tone="gold" />
@@ -947,11 +1172,6 @@ export function ChurchNetworkPrototypeApp() {
                 see your next Sunday role, and respond when leaders assign you to serve.
               </Text>
               <View style={styles.heroApprovedMetrics}>
-                <View style={styles.heroApprovedMetricCard}>
-                  <Text style={styles.heroApprovedMetricLabel}>Church Space</Text>
-                  <Text style={styles.heroApprovedMetricValue}>{selectedChurch.displayCity}</Text>
-                  <Text style={styles.heroApprovedMetricHint}>{selectedChurch.serviceTimes}</Text>
-                </View>
                 <View style={styles.heroApprovedMetricCard}>
                   <Text style={styles.heroApprovedMetricLabel}>Sunday Plan</Text>
                   <Text style={styles.heroApprovedMetricValue}>{heroNextAssignment ? formatAssignmentDate(heroNextAssignment.serviceDate) : 'Open'}</Text>
@@ -992,18 +1212,45 @@ export function ChurchNetworkPrototypeApp() {
           ) : null}
         </View>
 
-        <PublicChurchLinksSection church={selectedChurch} churches={churches} onOpenUrl={openUrl} />
-        <CommonMeetingsSection church={selectedChurch} onOpenUrl={openUrl} publishedEvents={publicCommonEvents} eventClock={eventClock} />
+        {activeAppTab === 'explore' ? (
+          <View key={activePublicTab} onLayout={registerContentAnchor('app:explore')}>
+            <PublicChurchLinksSection
+              church={selectedChurch}
+              churches={churches}
+              onOpenUrl={openUrl}
+              activePublicTab={activePublicTab}
+              availableTabs={availablePublicTabs}
+              registerAnchor={registerContentAnchor}
+            />
+          </View>
+        ) : null}
+        {activeAppTab === 'meetings' ? (
+          <View onLayout={registerContentAnchor('app:meetings')}>
+            <CommonMeetingsSection church={selectedChurch} onOpenUrl={openUrl} publishedEvents={publicCommonEvents} eventClock={eventClock} />
+            {stage === 'approved' ? (
+              <ChurchSpecificMeetingsSection
+                church={selectedChurch}
+                eventClock={eventClock}
+                events={churchEvents}
+              />
+            ) : null}
+          </View>
+        ) : null}
 
-        {stage === 'guest' ? <GuestScreen onRequestAccess={() => setStage('signin')} /> : null}
-        {stage === 'signin' ? (
-          <View onLayout={(event) => setSignInSectionY(event.nativeEvent.layout.y)}>
+        {activeAppTab === 'access' && stage === 'guest' ? <View onLayout={registerContentAnchor('access:guest')}><GuestScreen onRequestAccess={() => { setActiveAppTab('access'); setStage('signin'); }} /></View> : null}
+        {activeAppTab === 'access' && stage === 'signin' ? (
+          <View
+            onLayout={(event) => {
+              setSignInSectionY(event.nativeEvent.layout.y);
+              registerContentAnchor('access:signin')(event);
+            }}
+          >
             <SignInChoiceScreen validationMessage={validationMessage} isAuthenticating={isAuthenticating} onBack={() => setStage('guest')} onContinue={() => void authenticateMember()} />
           </View>
         ) : null}
-        {stage === 'profile' ? <ProfileScreen churches={churches} form={requestForm} selectedChurchName={selectedChurch.name} validationMessage={validationMessage} isSubmitting={isSubmitting} authSession={authSession} onBack={() => setStage('signin')} onChange={setRequestForm} onSubmit={() => void submitRequest()} /> : null}
-        {stage === 'pending' ? <PendingApprovalScreen approvalStatus={memberProfile?.approvalStatus ?? 'pending'} churchName={selectedChurch.name} email={requestForm.email} requestReference={requestReference} notificationStatusMessage={notificationStatusMessage} onBackToGuest={resetDemo} onReturnToProfile={() => setStage('profile')} /> : null}
-        {stage === 'approved' ? (
+        {activeAppTab === 'access' && stage === 'profile' ? <View onLayout={registerContentAnchor('access:profile')}><ProfileScreen churches={churches} form={requestForm} selectedChurchName={selectedChurch.name} validationMessage={validationMessage} isSubmitting={isSubmitting} authSession={authSession} onBack={() => setStage('signin')} onChange={setRequestForm} onSubmit={() => void submitRequest()} /></View> : null}
+        {activeAppTab === 'access' && stage === 'pending' ? <View onLayout={registerContentAnchor('access:pending')}><PendingApprovalScreen approvalStatus={memberProfile?.approvalStatus ?? 'pending'} churchName={selectedChurch.name} email={requestForm.email} requestReference={requestReference} notificationStatusMessage={notificationStatusMessage} onBackToGuest={resetDemo} onReturnToProfile={() => setStage('profile')} /></View> : null}
+        {activeAppTab === 'member' && stage === 'approved' ? (
           <ApprovedPreviewScreen
             form={requestForm}
             church={selectedChurch}
@@ -1035,9 +1282,15 @@ export function ChurchNetworkPrototypeApp() {
             onMarkPrayerAsPrayed={(request) => void markPrayerAsPrayed(request)}
             onOpenUrl={openUrl}
             memberProfile={memberProfile}
+            isCompactPhoneLayout={isCompactPhoneLayout}
+            activeView={activeMemberView}
+            onChangeView={setActiveMemberView}
             onReset={resetDemo}
+            registerAnchor={registerContentAnchor}
+            scrollToAnchor={scrollToAnchor}
           />
         ) : null}
+        {activeAppTab === 'help' ? <View onLayout={registerContentAnchor('app:help')}><HelpGuideScreen /></View> : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1052,6 +1305,9 @@ function GuestScreen({
     <>
       <View style={styles.actionRow}>
         <PrimaryButton label="Request Access" onPress={onRequestAccess} />
+      </View>
+      <View style={styles.noticeBox}>
+        <Text style={styles.noticeText}>Access is granted only to church members after approval by the church admin.</Text>
       </View>
     </>
   );
@@ -1269,6 +1525,7 @@ function ApprovedPreviewScreen({
   removingPrayerRequestId,
   markingPrayerRequestId,
   memberProfile,
+  isCompactPhoneLayout,
   respondingAssignmentId,
   onRespondToAssignment,
   onPrayerFormChange,
@@ -1277,6 +1534,10 @@ function ApprovedPreviewScreen({
   onMarkPrayerAsPrayed,
   onOpenUrl,
   onReset,
+  activeView,
+  onChangeView,
+  registerAnchor,
+  scrollToAnchor,
 }: {
   form: RequestForm;
   church: NetworkChurch;
@@ -1298,6 +1559,7 @@ function ApprovedPreviewScreen({
   removingPrayerRequestId: string | null;
   markingPrayerRequestId: string | null;
   memberProfile: MemberProfile | null;
+  isCompactPhoneLayout: boolean;
   respondingAssignmentId: string | null;
   onRespondToAssignment: (assignment: MemberAssignment, responseStatus: 'accepted' | 'declined') => void;
   onPrayerFormChange: (nextValue: PrayerRequestForm | ((current: PrayerRequestForm) => PrayerRequestForm)) => void;
@@ -1306,19 +1568,23 @@ function ApprovedPreviewScreen({
   onMarkPrayerAsPrayed: (request: ChurchPrayerRequest) => void;
   onOpenUrl: (url: string) => void;
   onReset: () => void;
+  activeView: MemberViewKey;
+  onChangeView: (view: MemberViewKey) => void;
+  registerAnchor: (anchorKey: string) => (event: LayoutChangeEvent) => void;
+  scrollToAnchor: (anchorKey: string) => void;
 }) {
-  const [showHelpGuide, setShowHelpGuide] = useState(false);
-  const [activeView, setActiveView] = useState<(typeof approvedMemberViews)[number]['key']>('home');
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState('');
   const sortedAssignments = useMemo(
     () =>
-      [...assignments].sort((left, right) => {
+      [...assignments]
+        .filter((assignment) => isUpcomingSundayAssignment(assignment.serviceDate, church.serviceTimes, eventClock))
+        .sort((left, right) => {
         const leftDate = parseCalendarDate(left.serviceDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
         const rightDate = parseCalendarDate(right.serviceDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
         return leftDate - rightDate;
       }),
-    [assignments],
+    [assignments, church.serviceTimes, eventClock],
   );
   const pendingAssignments = sortedAssignments.filter((assignment) => assignment.responseStatus === 'pending').length;
   const acceptedAssignments = sortedAssignments.filter((assignment) => assignment.responseStatus === 'accepted').length;
@@ -1349,7 +1615,7 @@ function ApprovedPreviewScreen({
     [eventClock, publicCommonEvents],
   );
   const groupedSundayPlan = useMemo(() => buildSundayPlanGroups(sortedAssignments), [sortedAssignments]);
-  const memberTeams = memberProfile?.teamNames ?? [];
+  const memberTeams = useMemo(() => normalizeVisibleTeamNames(memberProfile?.teamNames ?? []), [memberProfile?.teamNames]);
   const memberRole = memberProfile?.roleKey ? memberRoleLabels[memberProfile.roleKey] : 'Member';
   const calendarMonthDate = useMemo(() => getCalendarMonthDate(calendarMonthOffset), [calendarMonthOffset]);
   const nextEvent = useMemo(() => {
@@ -1479,66 +1745,8 @@ function ApprovedPreviewScreen({
           <Text style={styles.noticeText}>{notificationStatusMessage}</Text>
         </View>
       ) : null}
-      {churchSpecificMeetings.length > 0 ? (
-        <View style={styles.linkPanel}>
-          <Text style={styles.linkPanelTitle}>{`${church.displayCity} Meetings`}</Text>
-          <Text style={styles.linkPanelBody}>
-            Church-specific meetings for {church.displayCity}. These meetings are visible inside your approved member space and appear in the church calendar unless a church admin cancels an occurrence.
-          </Text>
-          <View style={styles.commonMeetingGrid}>
-            <View key={sundayServiceMeetingCard.key} style={styles.commonMeetingCard}>
-              <View style={styles.commonMeetingTop}>
-                <Text style={styles.commonMeetingTitle}>{sundayServiceMeetingCard.title}</Text>
-              </View>
-              <Text style={styles.commonMeetingDetail}>{sundayServiceMeetingCard.detail}</Text>
-              <Text style={styles.commonMeetingScope}>{sundayServiceMeetingCard.location}</Text>
-              <Text style={styles.commonMeetingBody}>{sundayServiceMeetingCard.body}</Text>
-            </View>
-            {churchSpecificMeetings.map((meeting) => (
-              <View key={meeting.key} style={styles.commonMeetingCard}>
-                <View style={styles.commonMeetingTop}>
-                  <Text style={styles.commonMeetingTitle}>{meeting.title}</Text>
-                </View>
-                <Text style={styles.commonMeetingDetail}>{meeting.detail}</Text>
-                <Text style={styles.commonMeetingScope}>{meeting.location}</Text>
-                <Text style={styles.commonMeetingBody}>{meeting.body}</Text>
-              </View>
-            ))}
-            {publishedChurchSpecificEvents.map((event) => (
-              <PublishedMeetingEventTile key={event.id} event={event} scopeLabel={church.displayCity} />
-            ))}
-          </View>
-        </View>
-      ) : publishedChurchSpecificEvents.length > 0 ? (
-        <View style={styles.linkPanel}>
-          <Text style={styles.linkPanelTitle}>{`${church.displayCity} Meetings`}</Text>
-          <Text style={styles.linkPanelBody}>
-            Church-specific meetings and published events for {church.displayCity}. These event tiles disappear automatically after the event ends.
-          </Text>
-          <View style={styles.commonMeetingGrid}>
-            <View key={sundayServiceMeetingCard.key} style={styles.commonMeetingCard}>
-              <View style={styles.commonMeetingTop}>
-                <Text style={styles.commonMeetingTitle}>{sundayServiceMeetingCard.title}</Text>
-              </View>
-              <Text style={styles.commonMeetingDetail}>{sundayServiceMeetingCard.detail}</Text>
-              <Text style={styles.commonMeetingScope}>{sundayServiceMeetingCard.location}</Text>
-              <Text style={styles.commonMeetingBody}>{sundayServiceMeetingCard.body}</Text>
-            </View>
-            {publishedChurchSpecificEvents.map((event) => (
-              <PublishedMeetingEventTile key={event.id} event={event} scopeLabel={church.displayCity} />
-            ))}
-          </View>
-        </View>
-      ) : null}
-      <View style={styles.moduleWrap}>
-        {approvedMemberViews.map((item) => (
-          <Pressable key={item.key} onPress={() => setActiveView(item.key)} style={[styles.modulePill, activeView === item.key && styles.modulePillActive]}>
-            <Text style={[styles.modulePillText, activeView === item.key && styles.modulePillTextActive]}>{item.label}</Text>
-          </Pressable>
-        ))}
-      </View>
       {activeView === 'home' ? (
-        <View style={styles.grid}>
+        <View style={styles.grid} onLayout={registerAnchor('member:home')}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>This week at {church.displayCity}</Text>
             <View style={styles.contentMetricRow}>
@@ -1573,55 +1781,8 @@ function ApprovedPreviewScreen({
           </View>
         </View>
       ) : null}
-      {activeView === 'sunday' ? (
-        <View style={styles.grid}>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>My Sunday plan</Text>
-            {assignmentNotice ? (
-              <View style={styles.noticeBox}>
-                <Text style={styles.noticeText}>{assignmentNotice}</Text>
-              </View>
-            ) : null}
-            {groupedSundayPlan.length > 0 ? (
-              groupedSundayPlan.map((serviceDay, dayIndex) => (
-                <View key={serviceDay.serviceDate} style={[styles.contentItem, dayIndex === 0 && styles.contentItemFirst]}>
-                  <Text style={styles.contentHeading}>{formatAssignmentDate(serviceDay.serviceDate)}</Text>
-                  <Text style={styles.contentMeta}>{church.serviceTimes} | {church.displayCity}</Text>
-                  <View style={styles.approvedActivityGroupList}>
-                    {serviceDay.activities.map((activity) => (
-                      <View key={`${serviceDay.serviceDate}-${activity.activityName}`} style={styles.approvedActivityCard}>
-                        <Text style={styles.approvedActivityTitle}>{activity.activityName}</Text>
-                        <Text style={styles.approvedActivityTeam}>{activity.teamName}</Text>
-                        {activity.assignments.map((assignment) => (
-                          <View key={assignment.id} style={styles.approvedRoleCard}>
-                            <View style={styles.assignmentTopRow}>
-                              <View style={styles.assignmentCopy}>
-                                <Text style={styles.contentHeading}>{assignment.roleName}</Text>
-                                <Text style={styles.contentMeta}>{assignment.teamName}</Text>
-                              </View>
-                              <View style={[styles.assignmentStatusBadge, assignment.responseStatus === 'accepted' && styles.assignmentStatusAccepted, assignment.responseStatus === 'declined' && styles.assignmentStatusDeclined]}>
-                                <Text style={[styles.assignmentStatusText, assignment.responseStatus !== 'pending' && styles.assignmentStatusTextDark]}>
-                                  {capitalize(assignment.responseStatus)}
-                                </Text>
-                              </View>
-                            </View>
-                            <Text style={styles.cardBody}>You are serving in {activity.activityName} as {assignment.roleName} for {church.displayCity}.</Text>
-                            {renderAssignmentActions(assignment)}
-                          </View>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.emptyState}>No Sunday assignments are visible yet. When your church schedules the coming service, this page will group your roles by activity and Sunday.</Text>
-            )}
-          </View>
-        </View>
-      ) : null}
       {activeView === 'announcements' ? (
-        <View style={styles.grid}>
+        <View style={styles.grid} onLayout={registerAnchor('member:announcements')}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Announcements</Text>
             {contentNotice ? (
@@ -1633,9 +1794,7 @@ function ApprovedPreviewScreen({
               {activeAnnouncements.length > 0 ? (
                 activeAnnouncements.map((announcement, index) => (
                   <View key={announcement.id} style={[styles.contentItem, index === 0 && styles.contentItemFirst]}>
-                    <Text style={styles.contentMeta}>
-                      {formatDetailedDate(announcement.publishedAt)} | {formatAnnouncementScope(announcement, church)}
-                    </Text>
+                    <Text style={styles.contentMeta}>{formatAnnouncementScope(announcement, church)}</Text>
                     <Text style={styles.contentHeading}>{announcement.title}</Text>
                     <Text style={styles.cardBody}>{announcement.body}</Text>
                     <Text style={styles.contentAudience}>{announcement.audienceLabel}</Text>
@@ -1646,10 +1805,6 @@ function ApprovedPreviewScreen({
               )}
             </View>
           </View>
-        </View>
-      ) : null}
-      {activeView === 'events' ? (
-        <View style={styles.grid}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Events</Text>
             <View style={styles.contentList}>
@@ -1680,7 +1835,7 @@ function ApprovedPreviewScreen({
         </View>
       ) : null}
       {activeView === 'calendar' ? (
-        <View style={styles.calendarWorkspace}>
+        <View style={styles.calendarWorkspace} onLayout={registerAnchor('member:calendar')}>
           <View style={[styles.card, styles.calendarBoardCard]}>
             <View style={styles.calendarHeader}>
               <View>
@@ -1697,7 +1852,7 @@ function ApprovedPreviewScreen({
             </View>
             <View style={styles.calendarWeekdayRow}>
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((weekday) => (
-                <Text key={weekday} style={styles.calendarWeekdayLabel}>{weekday}</Text>
+                <Text key={weekday} style={[styles.calendarWeekdayLabel, isCompactPhoneLayout && styles.calendarWeekdayLabelCompact]}>{weekday}</Text>
               ))}
             </View>
             <View style={styles.calendarGrid}>
@@ -1706,28 +1861,35 @@ function ApprovedPreviewScreen({
                 return (
                   <Pressable
                     key={day.dateKey}
-                    onPress={() => setSelectedCalendarDate(day.dateKey)}
+                    onPress={() => {
+                      setSelectedCalendarDate(day.dateKey);
+                      if (isCompactPhoneLayout) {
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                            scrollToAnchor('member:calendar-detail');
+                          });
+                        });
+                      }
+                    }}
                     style={[
                       styles.calendarDayTile,
+                      isCompactPhoneLayout && styles.calendarDayTileCompact,
                       !day.isCurrentMonth && styles.calendarDayTileMuted,
                       day.events.length > 0 && styles.calendarDayTileActive,
                       day.isToday && styles.calendarDayTileToday,
                       isSelected && styles.calendarDayTileSelected,
                     ]}
                   >
-                    <Text style={[styles.calendarDayNumber, !day.isCurrentMonth && styles.calendarDayNumberMuted]}>{day.dayNumber}</Text>
+                    <Text style={[styles.calendarDayNumber, isCompactPhoneLayout && styles.calendarDayNumberCompact, !day.isCurrentMonth && styles.calendarDayNumberMuted]}>{day.dayNumber}</Text>
                     {day.events.length > 0 ? (
-                      <>
-                        <Text style={styles.calendarEventCount}>{day.events.length} event{day.events.length > 1 ? 's' : ''}</Text>
-                        <Text style={styles.calendarEventPreview}>{day.events[0].scopeType === 'network' ? 'Network' : church.displayCity}</Text>
-                      </>
+                      <Text style={[styles.calendarEventCount, isCompactPhoneLayout && styles.calendarEventCountCompact]}>{day.events.length} event{day.events.length > 1 ? 's' : ''}</Text>
                     ) : null}
                   </Pressable>
                 );
               })}
             </View>
           </View>
-          <View style={[styles.card, styles.calendarDetailCard]}>
+          <View style={[styles.card, styles.calendarDetailCard]} onLayout={registerAnchor('member:calendar-detail')}>
             <Text style={styles.cardTitle}>{selectedCalendarEvents ? `Events on ${formatAssignmentDate(selectedCalendarEvents.dateKey)}` : 'Choose a day'}</Text>
             <View style={styles.contentList}>
               {selectedCalendarEvents && selectedCalendarEvents.events.length > 0 ? (
@@ -1757,7 +1919,7 @@ function ApprovedPreviewScreen({
         </View>
       ) : null}
       {activeView === 'prayer' ? (
-        <View style={styles.grid}>
+        <View style={styles.grid} onLayout={registerAnchor('member:prayer')}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Send a prayer request</Text>
             <Text style={styles.cardBody}>
@@ -1841,10 +2003,6 @@ function ApprovedPreviewScreen({
               )}
             </View>
           </View>
-        </View>
-      ) : null}
-      {activeView === 'prayerWall' ? (
-        <View style={styles.grid}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Prayer Wall</Text>
             <Text style={styles.cardBody}>
@@ -1885,8 +2043,8 @@ function ApprovedPreviewScreen({
           </View>
         </View>
       ) : null}
-      {activeView === 'teams' ? (
-        <View style={styles.grid}>
+      {activeView === 'teamsPlans' ? (
+        <View style={styles.grid} onLayout={registerAnchor('member:teamsPlans')}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>My teams</Text>
             <View style={styles.contentMetricRow}>
@@ -1907,6 +2065,49 @@ function ApprovedPreviewScreen({
             </View>
           </View>
           <View style={styles.card}>
+            <Text style={styles.cardTitle}>My Sunday plan</Text>
+            {assignmentNotice ? (
+              <View style={styles.noticeBox}>
+                <Text style={styles.noticeText}>{assignmentNotice}</Text>
+              </View>
+            ) : null}
+            {groupedSundayPlan.length > 0 ? (
+              groupedSundayPlan.map((serviceDay, dayIndex) => (
+                <View key={serviceDay.serviceDate} style={[styles.contentItem, dayIndex === 0 && styles.contentItemFirst]}>
+                  <Text style={styles.contentHeading}>{formatAssignmentDate(serviceDay.serviceDate)}</Text>
+                  <Text style={styles.contentMeta}>{church.serviceTimes} | {church.displayCity}</Text>
+                  <View style={styles.approvedActivityGroupList}>
+                    {serviceDay.activities.map((activity) => (
+                      <View key={`${serviceDay.serviceDate}-${activity.activityName}`} style={styles.approvedActivityCard}>
+                        <Text style={styles.approvedActivityTitle}>{activity.activityName}</Text>
+                        <Text style={styles.approvedActivityTeam}>{activity.teamName}</Text>
+                        {activity.assignments.map((assignment) => (
+                          <View key={assignment.id} style={styles.approvedRoleCard}>
+                            <View style={styles.assignmentTopRow}>
+                              <View style={styles.assignmentCopy}>
+                                <Text style={styles.contentHeading}>{assignment.roleName}</Text>
+                                <Text style={styles.contentMeta}>{assignment.teamName}</Text>
+                              </View>
+                              <View style={[styles.assignmentStatusBadge, assignment.responseStatus === 'accepted' && styles.assignmentStatusAccepted, assignment.responseStatus === 'declined' && styles.assignmentStatusDeclined]}>
+                                <Text style={[styles.assignmentStatusText, assignment.responseStatus !== 'pending' && styles.assignmentStatusTextDark]}>
+                                  {capitalize(assignment.responseStatus)}
+                                </Text>
+                              </View>
+                            </View>
+                            <Text style={styles.cardBody}>You are serving in {activity.activityName} as {assignment.roleName} for {church.displayCity}.</Text>
+                            {renderAssignmentActions(assignment)}
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyState}>No Sunday assignments are visible yet. When your church schedules the coming service, this page will group your roles by activity and Sunday.</Text>
+            )}
+          </View>
+          <View style={styles.card}>
             <Text style={styles.cardTitle}>Support in your church</Text>
             <View style={styles.contentList}>
               <View style={[styles.contentItem, styles.contentItemFirst]}>
@@ -1921,22 +2122,90 @@ function ApprovedPreviewScreen({
           </View>
         </View>
       ) : null}
-      {showHelpGuide ? (
-        <View style={styles.helpGuidePanel}>
-          <Text style={styles.helpGuideTitle}>Bethel Connect help guide</Text>
-          <Text style={styles.helpGuideIntro}>This guide explains the full Bethel Connect experience, from guest browsing and member approval to Sunday planning, prayer participation, calendar use, events, meetings, and support.</Text>
-          {helpGuideSections.map((section) => (
-            <View key={section.title} style={styles.helpGuideSection}>
-              <Text style={styles.helpGuideSectionTitle}>{section.title}</Text>
-              {section.points.map((point) => (
-                <Text key={point} style={styles.helpGuideBullet}>{`\u2022 ${point}`}</Text>
-              ))}
-            </View>
-          ))}
+    </>
+  );
+}
+
+function ChurchSpecificMeetingsSection({
+  church,
+  eventClock,
+  events,
+}: {
+  church: NetworkChurch;
+  eventClock: number;
+  events: ChurchEventItem[];
+}) {
+  const churchSpecificMeetings = churchSpecificMeetingCardsByChurch[church.id] ?? [];
+  const sundayServiceMeetingCard = {
+    key: `sunday-service-${church.id}`,
+    title: 'Sunday Service',
+    detail: church.serviceTimes,
+    location: church.address,
+    body: `Join the Sunday service at ${church.displayCity}.`,
+  };
+  const publishedChurchSpecificEvents = useMemo(
+    () =>
+      events
+        .filter((event) => event.scopeType !== 'network')
+        .filter((event) => {
+          const endAt = new Date(event.endAt).getTime();
+          return Number.isNaN(endAt) || endAt >= eventClock;
+        }),
+    [eventClock, events],
+  );
+
+  if (churchSpecificMeetings.length === 0 && publishedChurchSpecificEvents.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.linkPanel}>
+      <Text style={styles.linkPanelTitle}>{`${church.displayCity} Meetings`}</Text>
+      <Text style={styles.linkPanelBody}>
+        Church-specific meetings for {church.displayCity}. These meetings are visible inside your approved member space and appear in the church calendar unless a church admin cancels an occurrence.
+      </Text>
+      <View style={styles.commonMeetingGrid}>
+        <View key={sundayServiceMeetingCard.key} style={styles.commonMeetingCard}>
+          <View style={styles.commonMeetingTop}>
+            <Text style={styles.commonMeetingTitle}>{sundayServiceMeetingCard.title}</Text>
+          </View>
+          <Text style={styles.commonMeetingDetail}>{sundayServiceMeetingCard.detail}</Text>
+          <Text style={styles.commonMeetingScope}>{sundayServiceMeetingCard.location}</Text>
+          <Text style={styles.commonMeetingBody}>{sundayServiceMeetingCard.body}</Text>
         </View>
-      ) : null}
-      <View style={styles.actionRowWide}>
-        <SecondaryButton label={showHelpGuide ? 'Hide Help' : 'Help'} onPress={() => setShowHelpGuide((current) => !current)} />
+        {churchSpecificMeetings.map((meeting) => (
+          <View key={meeting.key} style={styles.commonMeetingCard}>
+            <View style={styles.commonMeetingTop}>
+              <Text style={styles.commonMeetingTitle}>{meeting.title}</Text>
+            </View>
+            <Text style={styles.commonMeetingDetail}>{meeting.detail}</Text>
+            <Text style={styles.commonMeetingScope}>{meeting.location}</Text>
+            <Text style={styles.commonMeetingBody}>{meeting.body}</Text>
+          </View>
+        ))}
+        {publishedChurchSpecificEvents.map((event) => (
+          <PublishedMeetingEventTile key={event.id} event={event} scopeLabel={church.displayCity} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function HelpGuideScreen() {
+  return (
+    <>
+      <SectionHeader title="Help" body="A complete guide to how Bethel Connect works, from public browsing to approved member workflows." />
+      <View style={styles.helpGuidePanel}>
+        <Text style={styles.helpGuideTitle}>Bethel Connect help guide</Text>
+        <Text style={styles.helpGuideIntro}>This guide explains the full Bethel Connect experience, from guest browsing and member approval to Sunday planning, prayer participation, calendar use, events, meetings, and support.</Text>
+        {helpGuideSections.map((section) => (
+          <View key={section.title} style={styles.helpGuideSection}>
+            <Text style={styles.helpGuideSectionTitle}>{section.title}</Text>
+            {section.points.map((point) => (
+              <Text key={point} style={styles.helpGuideBullet}>{`\u2022 ${point}`}</Text>
+            ))}
+          </View>
+        ))}
       </View>
     </>
   );
@@ -1946,48 +2215,42 @@ function PublicChurchLinksSection({
   church,
   churches,
   onOpenUrl,
+  activePublicTab,
+  availableTabs,
+  registerAnchor,
 }: {
   church: NetworkChurch;
   churches: NetworkChurch[];
   onOpenUrl: (url: string) => void;
+  activePublicTab: PublicLinkTabKey;
+  availableTabs: Array<{ key: PublicLinkTabKey; label: string; url?: string }>;
+  registerAnchor: (anchorKey: string) => (event: LayoutChangeEvent) => void;
 }) {
-  const [showAboutUs, setShowAboutUs] = useState(false);
-  const [showChurchLocations, setShowChurchLocations] = useState(false);
-  const openPublicLink = (url: string) => {
-    setShowAboutUs(false);
-    setShowChurchLocations(false);
-    onOpenUrl(url);
+  const instagramUrl = church.instagramUrl || 'https://www.instagram.com/bethel_international_church/';
+  const selectedPublicTab = availableTabs.find((item) => item.key === activePublicTab) ?? availableTabs[0];
+
+  const publicLinkTabCopy: Partial<Record<PublicLinkTabKey, { title: string; body: string; actionLabel: string }>> = {
+    connect: {
+      title: 'Connect with us',
+      body: 'Follow the church through its public media channels. Use YouTube for sermons and ministry videos, and Instagram for church updates, photos, and community highlights.',
+      actionLabel: 'Connect with us',
+    },
+    facebook: {
+      title: 'Facebook',
+      body: 'Open the church Facebook page to follow public announcements, community posts, and shared event updates.',
+      actionLabel: 'Open Facebook',
+    },
+    contact: {
+      title: 'Contact Us',
+      body: 'Use the church website for official public information, or contact the church directly on WhatsApp for support, questions, or visitor guidance.',
+      actionLabel: 'Contact Us',
+    },
   };
 
   return (
     <View style={styles.linkPanel}>
-      <Text style={styles.linkPanelTitle}>Public church links</Text>
-      <View style={styles.linkRow}>
-        <LinkButton
-          label="About Us"
-          onPress={() => {
-            setShowChurchLocations(false);
-            setShowAboutUs((current) => !current);
-          }}
-          active={showAboutUs}
-        />
-        <LinkButton
-          label="Church Locations"
-          onPress={() => {
-            setShowAboutUs(false);
-            setShowChurchLocations((current) => !current);
-          }}
-          active={showChurchLocations}
-        />
-        <LinkButton label="Church Website" url="https://bethel-pentecostal.org/" onOpenUrl={openPublicLink} />
-        {church.weeklyMeetingUrl ? <LinkButton label="Online Meeting Link" url={church.weeklyMeetingUrl} onOpenUrl={openPublicLink} /> : null}
-        {church.youtubeUrl ? <LinkButton label="YouTube Channel" url={church.youtubeUrl} onOpenUrl={openPublicLink} /> : null}
-        {church.instagramUrl ? <LinkButton label="Instagram" url={church.instagramUrl} onOpenUrl={openPublicLink} /> : null}
-        {church.facebookUrl ? <LinkButton label="Facebook" url={church.facebookUrl} onOpenUrl={openPublicLink} /> : null}
-        <LinkButton label="Contact Us" url={church.whatsappUrl} onOpenUrl={openPublicLink} />
-      </View>
-      {showAboutUs ? (
-        <View style={styles.aboutPanel}>
+      {activePublicTab === 'about' ? (
+        <View style={styles.aboutPanel} onLayout={registerAnchor('explore:about')}>
           <Text style={styles.aboutPanelTitle}>About Bethel International Pentecostal Church</Text>
           <Text style={styles.aboutPanelBody}>
             Bethel International Pentecostal Church describes itself as a loving church family where people from different backgrounds worship together, grow in prayer and ministry, and experience the power of Pentecost.
@@ -2002,8 +2265,8 @@ function PublicChurchLinksSection({
           </View>
         </View>
       ) : null}
-      {showChurchLocations ? (
-        <View style={styles.aboutPanel}>
+      {activePublicTab === 'locations' ? (
+        <View style={styles.aboutPanel} onLayout={registerAnchor('explore:locations')}>
           <Text style={styles.aboutPanelTitle}>Church Locations</Text>
           <Text style={styles.aboutPanelBody}>
             Browse the Bethel church locations in Germany. Each church card keeps the local city, Sunday time, address, and contact details in one place.
@@ -2016,13 +2279,53 @@ function PublicChurchLinksSection({
                     <Text style={styles.locationTitle}>{item.displayCity}</Text>
                     <Text style={styles.locationSubtitle}>{item.city}</Text>
                   </View>
-                  <Text style={styles.locationTime}>{item.serviceTimes}</Text>
                 </View>
                 <Text style={styles.locationAddress}>{item.address}</Text>
                 <Text style={styles.locationMeta}>{item.googleMapsLabel}</Text>
                 <Text style={styles.locationMeta}>{item.contactEmail}</Text>
+                <View style={styles.locationTimeRow}>
+                  <Text style={styles.locationTime}>{item.serviceTimes}</Text>
+                </View>
               </View>
             ))}
+          </View>
+        </View>
+      ) : null}
+      {selectedPublicTab && activePublicTab !== 'about' && activePublicTab !== 'locations' ? (
+        <View style={styles.aboutPanel} onLayout={registerAnchor(`explore:${activePublicTab}`)}>
+          <Text style={styles.aboutPanelTitle}>{publicLinkTabCopy[activePublicTab]?.title ?? selectedPublicTab.label}</Text>
+          <Text style={styles.aboutPanelBody}>{publicLinkTabCopy[activePublicTab]?.body ?? 'Open this church link to continue.'}</Text>
+          <View style={styles.actionRowWide}>
+            {activePublicTab === 'connect' ? (
+              <>
+                {church.youtubeUrl ? (
+                  <SecondaryButton
+                    label="YouTube Channel"
+                    onPress={() => onOpenUrl(church.youtubeUrl!)}
+                  />
+                ) : null}
+                <SecondaryButton
+                  label="Instagram"
+                  onPress={() => onOpenUrl(instagramUrl)}
+                />
+              </>
+            ) : activePublicTab === 'contact' ? (
+              <>
+                <SecondaryButton
+                  label="Church Website"
+                  onPress={() => onOpenUrl('https://bethel-pentecostal.org/')}
+                />
+                <SecondaryButton
+                  label="Contact Us"
+                  onPress={() => selectedPublicTab.url && onOpenUrl(selectedPublicTab.url)}
+                />
+              </>
+            ) : (
+              <SecondaryButton
+                label={publicLinkTabCopy[activePublicTab]?.actionLabel ?? 'Open Link'}
+                onPress={() => selectedPublicTab.url && onOpenUrl(selectedPublicTab.url)}
+              />
+            )}
           </View>
         </View>
       ) : null}
@@ -2061,15 +2364,17 @@ function CommonMeetingsSection({
           <View key={meeting.key} style={styles.commonMeetingCard}>
             <View style={styles.commonMeetingTop}>
               <Text style={styles.commonMeetingTitle}>{meeting.title}</Text>
-              {commonMeetingUrl ? (
-                <Pressable onPress={() => onOpenUrl(commonMeetingUrl)} style={styles.commonMeetingJoinButton}>
-                  <Text style={styles.commonMeetingJoinButtonText}>Join</Text>
-                </Pressable>
-              ) : null}
             </View>
             <Text style={styles.commonMeetingDetail}>{meeting.detail}</Text>
             <Text style={styles.commonMeetingScope}>{meeting.location}</Text>
             <Text style={styles.commonMeetingBody}>{meeting.body}</Text>
+            {commonMeetingUrl ? (
+              <View style={styles.commonMeetingJoinButtonWrap}>
+                <Pressable onPress={() => onOpenUrl(commonMeetingUrl)} style={styles.commonMeetingJoinButton}>
+                  <Text style={styles.commonMeetingJoinButtonText}>Join</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         ))}
         {activePublishedEvents.map((event) => (
@@ -2236,6 +2541,23 @@ function LinkButton({
 
 function capitalize(value: string) {
   return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
+function normalizeVisibleTeamNames(teamNames: string[]) {
+  const seen = new Set<string>();
+
+  return teamNames.reduce<string[]>((list, teamName) => {
+    const trimmedName = teamName.trim();
+    const normalizedKey = trimmedName.toLowerCase();
+
+    if (!trimmedName || seen.has(normalizedKey)) {
+      return list;
+    }
+
+    seen.add(normalizedKey);
+    list.push(trimmedName);
+    return list;
+  }, []);
 }
 
 function formatCompactDate(value: string) {
@@ -2675,11 +2997,17 @@ function buildSundayAssignmentRange(serviceDate: string, serviceTimes: string) {
     start.setHours(10, 0, 0, 0);
   }
 
-  const end = new Date(start.getTime() + 90 * 60 * 1000);
+  const end = new Date(start.getTime() + 150 * 60 * 1000);
   return {
     startAt: start.toISOString(),
     endAt: end.toISOString(),
   };
+}
+
+function isUpcomingSundayAssignment(serviceDate: string, serviceTimes: string, nowMs: number) {
+  const { endAt } = buildSundayAssignmentRange(serviceDate, serviceTimes);
+  const endTime = new Date(endAt).getTime();
+  return Number.isNaN(endTime) || endTime >= nowMs;
 }
 
 function buildGoogleCalendarUrl(event: {
@@ -2763,7 +3091,20 @@ const styles = StyleSheet.create({
   glow: { position: 'absolute', borderRadius: 999, backgroundColor: colors.glow },
   glowTop: { width: 260, height: 260, top: -80, right: -20 },
   glowBottom: { width: 300, height: 300, bottom: 130, left: -120, backgroundColor: 'rgba(29, 89, 100, 0.12)' },
+  scrollViewport: { flex: 1 },
+  scrollViewportSingleDock: { marginTop: 92 },
+  scrollViewportDoubleDock: { marginTop: 178 },
+  scrollViewportPhoneSingleDock: { marginTop: 80 },
+  scrollViewportPhoneDoubleDock: { marginTop: 146 },
+  scrollViewportApprovedSingleDock: { marginTop: 152 },
+  scrollViewportApprovedDoubleDock: { marginTop: 238 },
+  scrollViewportApprovedCompactSingleDock: { marginTop: 198 },
+  scrollViewportApprovedCompactDoubleDock: { marginTop: 284 },
+  scrollViewportApprovedPhoneSingleDock: { marginTop: 148 },
+  scrollViewportApprovedPhoneDoubleDock: { marginTop: 214 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 56 },
+  scrollContentSingleDock: { paddingBottom: 48 },
+  scrollContentDoubleDock: { paddingBottom: 48 },
   hero: { backgroundColor: colors.midnight, borderRadius: 30, padding: 22, marginBottom: 18, gap: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   heroTopRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' },
   heroBrandColumn: { flex: 1, minWidth: 240, gap: 12 },
@@ -2825,6 +3166,266 @@ const styles = StyleSheet.create({
   heroModeBadgeText: { color: colors.ink, fontSize: 15, fontWeight: '900', letterSpacing: 0.4 },
   heroSignOutButton: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   heroSignOutButtonText: { color: colors.white, fontSize: 14, fontWeight: '800' },
+  topDockLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    gap: 10,
+    zIndex: 40,
+    elevation: 20,
+  },
+  topDockLayerCompact: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    gap: 6,
+  },
+  memberHeaderStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,252,246,0.98)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(16,32,51,0.08)',
+    shadowColor: '#0C1826',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  memberHeaderStripCompact: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  memberHeaderIdentity: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  memberHeaderIdentityCompact: {
+    flex: 0,
+  },
+  memberHeaderLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+  },
+  memberHeaderTitle: {
+    flex: 1,
+    color: colors.midnight,
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  memberHeaderTitleCompact: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  memberHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
+  memberHeaderActionsCompact: {
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  memberHeaderMemberTile: {
+    backgroundColor: colors.teal,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    maxWidth: 148,
+  },
+  memberHeaderMemberTileCompact: {
+    maxWidth: 170,
+  },
+  memberHeaderMemberTileText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
+  memberHeaderMemberTileTextCompact: {
+    fontSize: 11,
+  },
+  memberHeaderModeBadge: {
+    backgroundColor: colors.gold,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(16,32,51,0.08)',
+  },
+  memberHeaderModeBadgeText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
+  memberHeaderSignOutButton: {
+    backgroundColor: colors.midnight,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  memberHeaderSignOutButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
+  appTabDock: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,252,246,0.98)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(16,32,51,0.08)',
+    shadowColor: '#0C1826',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+  appTabDockCompact: {
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  appTabDockPill: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 52,
+    backgroundColor: colors.paper,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.softLine,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appTabDockPillCompact: {
+    minHeight: 40,
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
+  appTabDockPillActive: {
+    backgroundColor: colors.midnight,
+    borderColor: colors.midnight,
+  },
+  appTabDockPillText: {
+    color: colors.midnight,
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  appTabDockPillTextCompact: {
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  appTabDockPillTextActive: {
+    color: colors.white,
+  },
+  memberTabDock: {
+    backgroundColor: 'rgba(255,252,246,0.98)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(16,32,51,0.08)',
+    paddingVertical: 10,
+    shadowColor: '#0C1826',
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
+  memberTabDockCompact: {
+    borderRadius: 18,
+    paddingVertical: 6,
+  },
+  memberTabDockScroll: {
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  memberTabDockScrollCompact: {
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  memberTabDockPill: {
+    minHeight: 46,
+    backgroundColor: colors.paper,
+    borderRadius: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.softLine,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberTabDockPillCompact: {
+    minHeight: 34,
+    borderRadius: 11,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  memberTabDockPillActive: {
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
+  },
+  memberTabDockPillText: {
+    color: colors.midnight,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  memberTabDockPillTextCompact: {
+    fontSize: 11,
+  },
+  memberTabDockPillTextActive: {
+    color: colors.white,
+  },
+  appTabWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4, marginBottom: 18 },
+  appTabPill: {
+    flexGrow: 1,
+    minWidth: 116,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appTabPillActive: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
+  },
+  appTabPillText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  appTabPillTextActive: {
+    color: colors.ink,
+  },
   authModeToggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
   authModeToggle: { flexGrow: 1, minWidth: 140, backgroundColor: colors.paper, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: colors.softLine, alignItems: 'center', justifyContent: 'center' },
   authModeToggleActive: { backgroundColor: '#FFF3D7', borderColor: colors.gold },
@@ -2848,6 +3449,7 @@ const styles = StyleSheet.create({
   commonMeetingTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   commonMeetingTitle: { color: colors.midnight, fontSize: 18, fontWeight: '800', lineHeight: 24 },
   commonMeetingPoster: { width: '100%', height: 146, borderRadius: 18, marginBottom: 14, backgroundColor: '#E7EDF2' },
+  commonMeetingJoinButtonWrap: { marginTop: 14, alignItems: 'center', justifyContent: 'center' },
   commonMeetingJoinButton: { backgroundColor: colors.navy, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minWidth: 62, alignItems: 'center', justifyContent: 'center' },
   commonMeetingJoinButtonText: { color: colors.white, fontSize: 13, fontWeight: '800' },
   commonMeetingDetail: { color: colors.teal, fontSize: 14, fontWeight: '800', marginTop: 8 },
@@ -2869,12 +3471,14 @@ const styles = StyleSheet.create({
   locationCopy: { flex: 1 },
   locationTitle: { color: colors.midnight, fontSize: 20, fontWeight: '800' },
   locationSubtitle: { color: colors.teal, fontSize: 14, fontWeight: '700', marginTop: 4 },
+  locationTimeRow: { marginTop: 14, alignItems: 'center', justifyContent: 'center' },
   locationTime: { color: colors.white, backgroundColor: colors.navy, overflow: 'hidden', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, fontWeight: '800' },
   locationAddress: { color: colors.ink, fontSize: 15, lineHeight: 22, marginTop: 14, marginBottom: 10 },
   linkPanelBody: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 6 },
   locationMeta: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
   linkPanel: { backgroundColor: colors.midnight, borderRadius: 28, padding: 20, marginBottom: 22 },
   linkPanelTitle: { color: colors.white, fontSize: 22, fontWeight: '800', lineHeight: 28, marginBottom: 14 },
+  linkTabRow: { gap: 10, paddingBottom: 4 },
   linkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   linkButton: { backgroundColor: colors.white, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12 },
   linkButtonActive: { backgroundColor: colors.gold },
@@ -2907,16 +3511,19 @@ const styles = StyleSheet.create({
   calendarMonthBadgeText: { color: colors.midnight, fontSize: 15, fontWeight: '800' },
   calendarWeekdayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   calendarWeekdayLabel: { flexBasis: '13%', color: colors.teal, fontSize: 12, fontWeight: '800', textAlign: 'center', textTransform: 'uppercase' },
+  calendarWeekdayLabelCompact: { fontSize: 10 },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   calendarDayTile: { flexBasis: '13%', minHeight: 80, backgroundColor: colors.white, borderRadius: 16, paddingHorizontal: 6, paddingVertical: 8, borderWidth: 1, borderColor: colors.softLine, justifyContent: 'space-between' },
+  calendarDayTileCompact: { minHeight: 64, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 14 },
   calendarDayTileMuted: { opacity: 0.55, backgroundColor: '#FBF8F1' },
   calendarDayTileActive: { borderColor: colors.teal, backgroundColor: '#F3FBFC' },
   calendarDayTileToday: { borderColor: colors.navy, borderWidth: 2, backgroundColor: '#EEF4FF' },
   calendarDayTileSelected: { borderColor: colors.gold, borderWidth: 2, backgroundColor: '#FFF8EA' },
   calendarDayNumber: { color: colors.midnight, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  calendarDayNumberCompact: { fontSize: 14 },
   calendarDayNumberMuted: { color: colors.muted },
   calendarEventCount: { color: colors.navy, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  calendarEventPreview: { color: colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 14 },
+  calendarEventCountCompact: { fontSize: 9, lineHeight: 11 },
   approvedActivityGroupList: { gap: 12, marginTop: 14 },
   approvedActivityCard: { backgroundColor: colors.parchment, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: colors.softLine, gap: 10 },
   approvedActivityTitle: { color: colors.midnight, fontSize: 18, fontWeight: '800' },
@@ -2969,10 +3576,10 @@ const styles = StyleSheet.create({
   helperText: { color: colors.teal, fontSize: 14, fontWeight: '700', lineHeight: 20 },
   errorText: { color: '#A83A2E', fontSize: 14, fontWeight: '700', marginTop: 10 },
   recaptchaContainer: { width: 1, height: 1, opacity: 0, overflow: 'hidden' },
-  moduleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 22 },
-  modulePill: { backgroundColor: colors.paper, borderColor: colors.softLine, borderWidth: 1, borderRadius: 22, paddingHorizontal: 20, paddingVertical: 16, minWidth: 164, alignItems: 'center', justifyContent: 'center' },
+  moduleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 },
+  modulePill: { flexGrow: 1, backgroundColor: colors.paper, borderColor: colors.softLine, borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 14, minWidth: 120, alignItems: 'center', justifyContent: 'center' },
   modulePillActive: { backgroundColor: colors.teal, borderColor: colors.teal },
-  modulePillText: { color: colors.navy, fontSize: 17, fontWeight: '800', textAlign: 'center', lineHeight: 22 },
+  modulePillText: { color: colors.navy, fontSize: 15, fontWeight: '800', textAlign: 'center', lineHeight: 20 },
   modulePillTextActive: { color: colors.white },
   contentList: { gap: 14 },
   contentItem: { paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.softLine },

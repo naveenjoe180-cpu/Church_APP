@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bethel Connect Platform Documentation</title>
+  <style>
+    :root {
+      --ink: #1d2a39;
+      --muted: #556274;
+      --gold: #b5883b;
+      --bg: #f4f1ea;
+      --card: #ffffff;
+      --line: #d9d1c2;
+      --navy: #24364d;
+      --soft: #eef2f7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.6;
+    }
+
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 32px 64px;
+    }
+
+    .cover,
+    .section,
+    .chapter {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 28px 30px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(29, 42, 57, 0.06);
+    }
+
+    .cover {
+      background: linear-gradient(145deg, #ffffff 0%, #f7f3eb 100%);
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0 0 12px;
+      color: var(--navy);
+      line-height: 1.25;
+    }
+
+    h1 { font-size: 2.2rem; }
+    h2 { font-size: 1.55rem; margin-top: 8px; }
+    h3 { font-size: 1.15rem; margin-top: 18px; }
+    h4 { font-size: 1rem; margin-top: 14px; }
+
+    p { margin: 0 0 12px; }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+
+    .muted { color: var(--muted); }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .meta-card,
+    .info-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #fffdfa;
+    }
+
+    .meta-card strong,
+    .info-card strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--navy);
+    }
+
+    .toc {
+      columns: 2;
+      column-gap: 40px;
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .toc li { margin-bottom: 8px; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    ul, ol {
+      margin: 0 0 12px 20px;
+      padding: 0;
+    }
+
+    li { margin-bottom: 8px; }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--soft);
+      border: 1px solid #d8e0ea;
+      font-size: 0.9rem;
+      color: var(--navy);
+    }
+
+    .note {
+      border-left: 4px solid var(--gold);
+      padding: 12px 14px;
+      background: #fcf8ef;
+      border-radius: 10px;
+      margin: 14px 0;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+      margin: 20px 0;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .page { max-width: none; padding: 0; }
+      .cover, .section, .chapter {
+        box-shadow: none;
+        break-inside: avoid;
+        margin-bottom: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="cover">
+      <span class="eyebrow">Platform Documentation</span>
+      <h1>Bethel Connect</h1>
+      <p class="muted">
+        Comprehensive product documentation for the Bethel Connect User App and Bethel Admin Connect,
+        including workflows, responsibilities, feature behavior, and operational guidance.
+      </p>
+
+      <div class="meta">
+        <div class="meta-card">
+          <strong>Prepared For</strong>
+          <span>Bethel Connect platform stakeholders, testers, and church leaders</span>
+        </div>
+        <div class="meta-card">
+          <strong>Generated</strong>
+          <span>4 April 2026</span>
+        </div>
+        <div class="meta-card">
+          <strong>Scope</strong>
+          <span>User App, Admin App, shared workflows, and operational model</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <span class="eyebrow">Contents</span>
+      <h2>Table of Contents</h2>
+      <ol class="toc">
+        <li>Platform Overview</li>
+        <li>Shared Concepts and Operating Model</li>
+        <li>Chapter One: Bethel Connect User App</li>
+        <li>Chapter Two: Bethel Admin Connect</li>
+        <li>Security, Governance, and Operational Notes</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <span class="eyebrow">1</span>
+      <h2>Platform Overview</h2>
+      <p>
+        Bethel Connect is a connected church operations platform made up of two distinct products that
+        serve different audiences while working from the same core data model. The User App supports
+        church members, guests, and approved volunteers. The Admin App supports church administrators,
+        super administrators, and other leadership roles responsible for approvals, communication,
+        Sunday planning, event coordination, and church setup.
+      </p>
+      <p>
+        The platform is designed around a church-scoped operating model. Members belong to a specific
+        church, access requests are routed to the corresponding church administration flow, and most
+        content is intentionally filtered by the member’s church. At the same time, some meetings and
+        events are shared across the wider Bethel network, so the platform also supports common
+        announcements and common events that appear across all churches where appropriate.
+      </p>
+      <div class="grid-2">
+        <div class="info-card">
+          <strong>User App</strong>
+          <span>Guest exploration, access request flow, approved member dashboard, Sunday planning, prayer, calendar, announcements, and meetings.</span>
+        </div>
+        <div class="info-card">
+          <strong>Admin App</strong>
+          <span>Approval queue, prayer moderation, member management, ministry planning, announcements, events, church setup, and operational oversight.</span>
+        </div>
+      </div>
+      <div class="note">
+        The platform uses a deliberate separation of concerns: public discovery and member experience are
+        kept simple in the User App, while operational control and sensitive actions are kept inside the
+        Admin App.
+      </div>
+    </section>
+
+    <section class="section">
+      <span class="eyebrow">2</span>
+      <h2>Shared Concepts and Operating Model</h2>
+      <div class="chip-row">
+        <span class="chip">Church-scoped access</span>
+        <span class="chip">Google sign-in</span>
+        <span class="chip">Approval-based membership</span>
+        <span class="chip">Common and church-specific events</span>
+        <span class="chip">Sunday service planning</span>
+        <span class="chip">Prayer moderation</span>
+      </div>
+      <h3>Church identity</h3>
+      <p>
+        Every church location is represented using the Bethel naming convention, such as Bethel
+        Nuremberg or Bethel Cologne. This convention appears throughout the app so that members and
+        admins always understand which church context they are operating in.
+      </p>
+      <h3>Access and approval</h3>
+      <p>
+        The platform currently uses Google sign-in as the primary authentication method. Signing in does
+        not automatically grant member access. A user must first request access by selecting the church
+        they belong to. That request is then reviewed by the relevant church administrator. Once approved,
+        the same Google account can sign in and move directly into the member experience.
+      </p>
+      <h3>Content distribution model</h3>
+      <ul>
+        <li>Church-specific content appears only for members of that church.</li>
+        <li>Common Bethel meetings can be visible across all churches and even in guest mode.</li>
+        <li>Announcements and events can be published either locally or network-wide.</li>
+        <li>Prayer requests are moderated and visible only inside the relevant church context after approval.</li>
+      </ul>
+    </section>
+
+    <section class="chapter">
+      <span class="eyebrow">3</span>
+      <h2>Chapter One: Bethel Connect User App</h2>
+      <p>
+        The User App is the member-facing side of the platform. It is intentionally designed to support
+        two very different states: the public discovery experience for guests, and the private ministry
+        experience for approved members. The app also supports intermediate access states so that a person
+        can sign in, submit a church access request, wait for approval, and then transition smoothly into
+        their private member dashboard.
+      </p>
+
+      <h3>3.1 User App structure</h3>
+      <p>The top-level structure of the User App is organized around four main areas.</p>
+      <div class="chip-row">
+        <span class="chip">Access / Member</span>
+        <span class="chip">Explore</span>
+        <span class="chip">Meetings</span>
+        <span class="chip">Help</span>
+      </div>
+      <p>
+        In guest mode, the first top-level tab is Access. After approval, that first top-level tab becomes
+        Member. This gives the app a consistent layout while still adapting to the user’s current state.
+      </p>
+
+      <h3>3.2 Guest experience</h3>
+      <p>
+        Guests can browse public church information without entering the private member area. This keeps
+        the app useful for first-time visitors while still protecting member-only content.
+      </p>
+      <h4>Explore</h4>
+      <p>
+        Explore is the public discovery area. It uses sub-tabs so guests can move directly to the type of
+        information they want without scrolling through a very long page.
+      </p>
+      <ul>
+        <li><strong>About Us:</strong> explains the church background, multicultural identity, worship culture, and expansion across Europe.</li>
+        <li><strong>Church Locations:</strong> presents Bethel church locations with service times and local context.</li>
+        <li><strong>Connect with us:</strong> groups YouTube and Instagram connectivity in one place.</li>
+        <li><strong>Facebook:</strong> provides the Facebook connection path.</li>
+        <li><strong>Contact Us:</strong> combines the church website and contact route in one panel.</li>
+      </ul>
+
+      <h4>Meetings</h4>
+      <p>
+        Guests can also see Bethel Church Common Meetings. These are the regular network-wide meeting
+        rhythms that help visitors understand how the church lives and gathers through the week.
+      </p>
+      <ul>
+        <li>Daily Intercessory Prayer, except Sundays</li>
+        <li>Mid Week Meeting</li>
+        <li>Youth Meeting</li>
+      </ul>
+
+      <h4>Access</h4>
+      <p>
+        Access is the guest entry point into the secure member flow. It contains the sign-in action and
+        clearly explains that access is granted only to church members after approval by the church admin.
+      </p>
+
+      <h3>3.3 Sign-in and member approval workflow</h3>
+      <ol>
+        <li>The user taps Continue With Google.</li>
+        <li>If the user does not already have approved access, the app opens the request-access flow.</li>
+        <li>The user selects the church they belong to and can add an optional message.</li>
+        <li>The request is routed to the corresponding church admin for approval.</li>
+        <li>Until approval is granted, the user stays in an awaiting-approval state.</li>
+        <li>Once approved, the same Google sign-in takes the user directly into the member area.</li>
+      </ol>
+      <div class="note">
+        The app is deliberately designed so that authentication and authorization are separate. Signing in
+        proves account identity. Approval grants church membership access.
+      </div>
+
+      <h3>3.4 Approved member mode</h3>
+      <p>
+        Approved members receive a dedicated member workspace. On mobile, the app uses a fixed header
+        strip and tab structure so members can navigate quickly without losing orientation.
+      </p>
+      <p>The member area currently groups private content into the following major views:</p>
+      <div class="chip-row">
+        <span class="chip">Home</span>
+        <span class="chip">My Teams &amp; Plans</span>
+        <span class="chip">Announcements</span>
+        <span class="chip">Calendar</span>
+        <span class="chip">Prayer</span>
+      </div>
+
+      <h3>3.5 Member header strip and navigation model</h3>
+      <p>
+        The fixed header strip in member mode keeps core identity information always visible. It shows the
+        church logo, church name, member name, current role or mode, and the sign-out action. Under that,
+        the main member tabs stay visible so the user can move between sections quickly.
+      </p>
+      <p>
+        This design reduces confusion on mobile devices because the user no longer needs to scroll back to
+        the top of a long page to change context.
+      </p>
+
+      <h3>3.6 Home</h3>
+      <p>
+        Home acts as the member dashboard. It is intended to answer the question, “What should I pay
+        attention to right now?” rather than duplicating every detail already available in deeper sections.
+      </p>
+      <ul>
+        <li>Highlights the next upcoming event.</li>
+        <li>Surfaces the next Sunday responsibility when one exists.</li>
+        <li>Shows church-specific context for the member’s current church.</li>
+        <li>Provides a fast summary before the user moves into planning, calendar, prayer, or announcements.</li>
+      </ul>
+
+      <h3>3.7 My Teams &amp; Plans</h3>
+      <p>
+        This section combines team identity with practical ministry planning so the member can see both
+        where they serve and what they are expected to do next.
+      </p>
+      <h4>My teams</h4>
+      <ul>
+        <li>Shows the current church role assigned to the member.</li>
+        <li>Lists the teams the member belongs to, such as Worship Team, Speakers Team, Tech Team, Sunday School Team, or Food Team.</li>
+        <li>Helps members understand why they are being assigned certain Sunday responsibilities.</li>
+      </ul>
+      <h4>My Sunday plan</h4>
+      <ul>
+        <li>Groups assignments by Sunday and by activity instead of showing a flat list.</li>
+        <li>Lets the member accept or decline assignments.</li>
+        <li>Automatically removes stale Sunday requests after the Sunday service window has passed.</li>
+        <li>Removes assignments from active response view when the assignment is deleted or reassigned by an admin.</li>
+      </ul>
+      <h4>Support in your church</h4>
+      <p>
+        This area provides guidance and contact pathways for church-specific support needs. It is where the
+        member can understand how to get help if they have ministry-planning questions or service-related
+        issues.
+      </p>
+
+      <h3>3.8 Announcements</h3>
+      <p>
+        Announcements combines communication and event awareness in one place. The goal is to simplify the
+        member experience by reducing the number of separate sections they need to check.
+      </p>
+      <h4>Announcements tile</h4>
+      <ul>
+        <li>Shows church-specific or common announcements based on publication scope.</li>
+        <li>Uses church identity labels instead of exposing internal publisher emails.</li>
+        <li>Automatically hides announcements after their configured visibility duration ends.</li>
+        <li>Removes publishing date and time from the member-facing announcement view to keep the interface simpler.</li>
+      </ul>
+      <h4>Events tile under Announcements</h4>
+      <ul>
+        <li>Displays church-specific events and common events below the announcement content.</li>
+        <li>Can show event posters when one is published by leadership.</li>
+        <li>Supports multi-day event behavior in the calendar model.</li>
+        <li>Automatically removes events from active display when the event end time has passed.</li>
+      </ul>
+
+      <h3>3.9 Calendar</h3>
+      <p>
+        Calendar is one of the most important member coordination tools. It combines recurring default
+        meetings, church-specific meetings, Sunday Service, and published events into one coherent month
+        view.
+      </p>
+      <ul>
+        <li>Opens on the current month by default.</li>
+        <li>Highlights today’s date for quick orientation.</li>
+        <li>Uses month-name navigation rather than generic previous and next labels.</li>
+        <li>On mobile, keeps day tiles visually lighter by removing excess label text inside date cells.</li>
+        <li>Supports auto-scroll to the day’s event detail tile when a date is tapped on mobile.</li>
+      </ul>
+      <h4>What the calendar includes</h4>
+      <ul>
+        <li><strong>Sunday Service:</strong> created automatically for every Sunday, based on the current service time of the member’s church, with a 2.5-hour service duration in the event model.</li>
+        <li><strong>Bethel Church Common Meetings:</strong> recurring shared meetings that appear across churches.</li>
+        <li><strong>Church Specific Meetings:</strong> recurring meetings for the member’s own church.</li>
+        <li><strong>Published events:</strong> local or common events created by leadership.</li>
+      </ul>
+      <h4>Meeting tiles and event actions</h4>
+      <ul>
+        <li>Common meetings are visible in their own section and can include a Join button for online meetings.</li>
+        <li>Church-specific meetings appear under the approved member area for the specific church.</li>
+        <li>Where relevant, events support Add To Calendar and Download Invite actions.</li>
+      </ul>
+
+      <h3>3.10 Prayer</h3>
+      <p>
+        Prayer now combines personal submission and shared prayer participation into a single streamlined
+        space. This reduces fragmentation and makes it easier for members to understand the full prayer
+        workflow of the church.
+      </p>
+      <h4>Submit prayer request</h4>
+      <ul>
+        <li>Members can submit a prayer request from the Prayer section.</li>
+        <li>Requests can be shared anonymously if the member prefers.</li>
+        <li>The request is visible publicly only after moderation and approval.</li>
+      </ul>
+      <h4>My prayer requests</h4>
+      <ul>
+        <li>Shows the user’s own submitted requests.</li>
+        <li>Lets the member understand whether a request is waiting, approved, or no longer active.</li>
+        <li>Allows the member to remove their own prayer requests.</li>
+      </ul>
+      <h4>Prayer Wall</h4>
+      <ul>
+        <li>Appears below My prayer requests inside the same Prayer page.</li>
+        <li>Displays approved prayer requests from the same church as tiles.</li>
+        <li>Supports a Pray action, which changes to Prayed for that user only.</li>
+        <li>Does not reveal private response state to other members.</li>
+      </ul>
+
+      <h3>3.11 Meetings experience</h3>
+      <p>
+        Meetings has both a public and private dimension. Public users can see the common rhythm of the
+        church network, while approved members also see the meetings specific to their church.
+      </p>
+      <h4>Bethel Church Common Meetings</h4>
+      <ul>
+        <li>Daily Intercessory Prayer, except Sundays</li>
+        <li>Mid Week Meeting</li>
+        <li>Youth Meeting</li>
+      </ul>
+      <p>
+        These are marked as online by default in the app and appear both in the dedicated meetings area
+        and in the calendar model.
+      </p>
+      <h4>Church Specific Meetings</h4>
+      <p>
+        Each church can have its own meeting rhythm in addition to Sunday Service. For example, Bethel
+        Nuremberg includes Bible Reading and Church Intercessory Prayer. These appear as church-specific
+        meeting tiles and also feed the calendar.
+      </p>
+
+      <h3>3.12 Help</h3>
+      <p>
+        The Help section is a built-in operating guide for users. It explains the full journey from guest
+        discovery to approved member use, and it also provides recommended weekly workflows so people know
+        how to use the app effectively rather than only knowing where features are located.
+      </p>
+
+      <h3>3.13 User app design principles</h3>
+      <ul>
+        <li>Keep guest exploration open and simple.</li>
+        <li>Keep member access protected through approval.</li>
+        <li>Reduce long-page fatigue with tab structures and automatic scrolling to the relevant content tile.</li>
+        <li>Keep private church content scoped to the relevant church.</li>
+        <li>Use a mobile-first navigation pattern for approved members.</li>
+      </ul>
+    </section>
+
+    <section class="chapter">
+      <span class="eyebrow">4</span>
+      <h2>Chapter Two: Bethel Admin Connect</h2>
+      <p>
+        Bethel Admin Connect is the operational control center for the platform. It is a web-based admin
+        dashboard focused on controlled access, structured oversight, and practical church operations. Its
+        primary responsibility is not public presentation but administration: making sure the right people
+        are approved, the right members are assigned, Sunday plans are accurate, events are communicated,
+        and church data remains current.
+      </p>
+
+      <h3>4.1 Admin app navigation structure</h3>
+      <div class="chip-row">
+        <span class="chip">Overview</span>
+        <span class="chip">Approval Queue</span>
+        <span class="chip">Members</span>
+        <span class="chip">Team Planning</span>
+        <span class="chip">Announcements and Events</span>
+        <span class="chip">Churches And Teams</span>
+        <span class="chip">Role Matrix</span>
+        <span class="chip">Help</span>
+      </div>
+      <p>
+        The selected church context shapes much of the dashboard behavior. Most actions apply to the
+        chosen church unless an admin is intentionally creating a network-wide event or acting as a super
+        admin across churches.
+      </p>
+
+      <h3>4.2 Overview</h3>
+      <p>
+        Overview is the operational front page. It is intended to answer what needs attention now rather
+        than replace the specialized tools deeper in the dashboard.
+      </p>
+      <ul>
+        <li>Summarizes church readiness and current operational signals.</li>
+        <li>Highlights the next upcoming event using the same logic used in the member-facing app.</li>
+        <li>Surfaces approvals waiting, member follow-up, planning context, and recent activity.</li>
+        <li>Acts as the recommended daily starting point for admins.</li>
+      </ul>
+
+      <h3>4.3 Approval Queue</h3>
+      <p>
+        Approval Queue combines two important moderation tasks in one place: new member access requests and
+        prayer moderation. This keeps sensitive approval work together and helps admins maintain a clear
+        daily review routine.
+      </p>
+      <h4>Access approvals</h4>
+      <ul>
+        <li>Requests are routed by the church selected in the User App.</li>
+        <li>Queue supports search, filtering, visibility counts, and bulk operations.</li>
+        <li>Approving a request grants baseline member access, not elevated permissions.</li>
+      </ul>
+      <h4>Prayer moderation</h4>
+      <ul>
+        <li>Prayer requests appear below access approvals in their own moderation tile.</li>
+        <li>Super admins and church admins can approve, hide, or remove prayer requests.</li>
+        <li>Approved requests appear on the Prayer Wall for members in that church.</li>
+      </ul>
+
+      <h3>4.4 Members</h3>
+      <p>
+        Members is the control area for approved people after onboarding. It is where church leadership
+        can maintain role, team membership, and data quality.
+      </p>
+      <ul>
+        <li>Supports search and sorting for easier member discovery.</li>
+        <li>Filters by church, role, team, and status.</li>
+        <li>Allows editing of member email, role, and team membership.</li>
+        <li>Supports deletion of members by church admins and super admins, within the allowed permission model.</li>
+        <li>When a member is deleted, they lose access to the private member area until they are approved again.</li>
+      </ul>
+      <div class="note">
+        Member approval and elevated permissions are intentionally separate. Approval creates a member.
+        Administrative elevation should happen only inside Members, with intent and review.
+      </div>
+
+      <h3>4.5 Team Planning</h3>
+      <p>
+        Team Planning is the structured ministry scheduling tool for Sunday service operations. It is
+        designed around one person per role for each activity, helping church leaders avoid duplication
+        and ambiguity in service planning.
+      </p>
+      <h4>Core planning workflow</h4>
+      <ol>
+        <li>Select the Sunday and church context.</li>
+        <li>Assign people to the required ministry roles.</li>
+        <li>Confirm the activity plan.</li>
+        <li>Publish assignments to the relevant members.</li>
+      </ol>
+      <h4>Important planning behaviors</h4>
+      <ul>
+        <li>Confirmation is idempotent for the same person, role, church, and Sunday combination.</li>
+        <li>Members can accept or decline assignments from their app.</li>
+        <li>If an assignment is removed, the member no longer sees it as active.</li>
+        <li>Archived Sundays can be reviewed later for service history and comparison.</li>
+      </ul>
+
+      <h3>4.6 Announcements and Events</h3>
+      <p>
+        This section manages outgoing communication and scheduled event visibility. It supports both
+        church-specific communication and common network communication.
+      </p>
+      <h4>Announcements</h4>
+      <ul>
+        <li>Publish announcements to the selected church or broader scope where supported.</li>
+        <li>Choose a display duration such as 7, 14, or 30 days, or set a custom end date.</li>
+        <li>Delete announcements after publishing when needed.</li>
+        <li>Announcements automatically stop appearing in the User App after their visibility window ends.</li>
+      </ul>
+      <h4>Published events</h4>
+      <ul>
+        <li>Publish events as church-specific or common Bethel events.</li>
+        <li>Attach posters to improve visibility for members.</li>
+        <li>Manage events in separate lower sections for church-specific events and common events.</li>
+        <li>Delete published events from those management tiles.</li>
+      </ul>
+      <h4>Default recurring meetings</h4>
+      <ul>
+        <li>Common meetings such as Daily Intercessory Prayer, Mid Week Meeting, and Youth Meeting are represented in the admin model.</li>
+        <li>Church-specific default meetings, including Sunday Service and church recurring meetings, are also represented.</li>
+        <li>Admins can delete specific occurrences where a meeting does not take place.</li>
+      </ul>
+
+      <h3>4.7 Churches And Teams</h3>
+      <p>
+        Churches And Teams is the structural configuration area. It manages the physical and operational
+        identity of each church.
+      </p>
+      <ul>
+        <li>Create and edit church locations.</li>
+        <li>Maintain church details, support contacts, social links, and service times.</li>
+        <li>Maintain the team structure used elsewhere in planning and member assignment.</li>
+        <li>Keep church naming, service information, and public-facing details consistent.</li>
+      </ul>
+      <p>
+        Because Sunday Service and other recurring meeting behavior depend on church service time and
+        church metadata, this section has downstream impact on the calendar and meeting experience in the
+        User App.
+      </p>
+
+      <h3>4.8 Role Matrix</h3>
+      <p>
+        Role Matrix functions as a reference view for the permission model. It helps leadership understand
+        the intent of each role even though enforcement is ultimately controlled by application logic and
+        Firestore rules rather than this view itself.
+      </p>
+      <ul>
+        <li>Super Admin: broad cross-church authority.</li>
+        <li>Church Admin: strong local church operational authority.</li>
+        <li>Pastor: church leadership role with practical visibility but more limited destructive authority in some flows.</li>
+        <li>Volunteer and Member: narrower service and participation roles.</li>
+      </ul>
+      <p>
+        Whether the Role Matrix remains visible is a product-design choice. It is useful as a reference,
+        but it is not the source of permission truth.
+      </p>
+
+      <h3>4.9 Help</h3>
+      <p>
+        The Admin Help section is a built-in operating guide that explains what each dashboard area is for,
+        how to move through the app in a safe daily order, and how to avoid common mistakes such as mixing
+        approval work with role elevation or losing track of Sunday planning responsibilities.
+      </p>
+
+      <h3>4.10 Recommended admin operating workflow</h3>
+      <ol>
+        <li>Start in Overview.</li>
+        <li>Open Approval Queue for new members and prayer moderation.</li>
+        <li>Use Members to verify the right role, email, and team configuration.</li>
+        <li>Use Team Planning to shape and confirm Sunday service activity plans.</li>
+        <li>Use Announcements and Events to publish current communication and upcoming meetings.</li>
+        <li>Use Churches And Teams when church identity, service time, or contact structure changes.</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <span class="eyebrow">5</span>
+      <h2>Security, Governance, and Operational Notes</h2>
+      <h3>5.1 Access governance</h3>
+      <ul>
+        <li>Google sign-in identifies the account, but approval governs member access.</li>
+        <li>Church selection during request flow determines the approval route.</li>
+        <li>Member deletion removes effective access to the private member area.</li>
+      </ul>
+
+      <h3>5.2 Prayer governance</h3>
+      <ul>
+        <li>Prayer requests are moderated before appearing publicly on the Prayer Wall.</li>
+        <li>Anonymous sharing is supported for the requesting member.</li>
+        <li>Pray and Prayed state is private to the member who clicked it.</li>
+      </ul>
+
+      <h3>5.3 Event governance</h3>
+      <ul>
+        <li>Events can be common or church-specific.</li>
+        <li>Recurring common and church-specific meetings feed both dedicated tiles and the calendar model.</li>
+        <li>Deleted or cancelled occurrences disappear from member-facing views.</li>
+        <li>Expired events and announcements are automatically removed from active display.</li>
+      </ul>
+
+      <h3>5.4 Mobile behavior</h3>
+      <ul>
+        <li>The User App has been optimized for mobile use with fixed navigation, section grouping, and reduced long-page scrolling.</li>
+        <li>Auto-scroll behavior is used to bring the user directly to relevant tiles after tab selection.</li>
+        <li>Calendar tiles are visually simplified on phone screens.</li>
+      </ul>
+
+      <h3>5.5 Closing summary</h3>
+      <p>
+        Bethel Connect is more than a simple information app. It is an operating environment for church
+        communication, church administration, ministry planning, and member participation. The User App
+        emphasizes clarity, access control, and practical weekly use. The Admin App emphasizes operational
+        control, moderation, planning accuracy, and church structure. Together they form a connected but
+        role-sensitive platform that supports both church life and church operations.
+      </p>
+    </section>
+  </div>
+</body>
+</html>

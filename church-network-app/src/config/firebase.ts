@@ -34,6 +34,12 @@ export const notificationConfig = {
   expoProjectId: process.env.EXPO_PUBLIC_EXPO_PROJECT_ID ?? '',
 };
 
+export const googleAuthConfig = {
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '',
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '',
+};
+
 export const firebaseNextSteps = [
   'Deploy the Cloud Functions notification worker and grant it access to Firebase Messaging.',
   'Add the Expo project ID so mobile devices can register for push notifications.',

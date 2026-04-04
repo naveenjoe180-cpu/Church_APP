@@ -3,7 +3,7 @@ import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/fires
 import { firestoreDb } from '../config/firebase';
 import type { AuthSession } from './auth';
 
-export type SignInMethod = 'google' | 'email';
+export type SignInMethod = 'google';
 
 export type AccessRequestPayload = {
   displayName: string;

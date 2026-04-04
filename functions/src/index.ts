@@ -1,18 +1,16 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions';
 import { onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 
 initializeApp();
 
 const firestore = getFirestore();
-const messaging = getMessaging();
 
 type DeviceTarget = {
   id: string;
   userId: string;
-  channel: 'web' | 'expo';
+  channel: 'expo';
   token: string;
   churchIds: string[];
   approvalStatus: string;
@@ -41,7 +39,7 @@ function mapDeviceTarget(snapshot: FirebaseFirestore.QueryDocumentSnapshot): Dev
   return {
     id: snapshot.id,
     userId: typeof rawValue.userId === 'string' ? rawValue.userId : '',
-    channel: rawValue.channel === 'expo' ? 'expo' : 'web',
+    channel: 'expo',
     token: typeof rawValue.token === 'string' ? rawValue.token : '',
     churchIds: Array.isArray(rawValue.churchIds) ? rawValue.churchIds.filter((item): item is string => typeof item === 'string') : [],
     approvalStatus: typeof rawValue.approvalStatus === 'string' ? rawValue.approvalStatus : 'pending',
@@ -69,35 +67,8 @@ async function getApprovedDevicesForChurch(churchId: string) {
   return snapshot.docs.map(mapDeviceTarget).filter((target) => Boolean(target.token));
 }
 
-async function sendWebNotifications(targets: DeviceTarget[], payload: NotificationPayload) {
-  const webTokens = targets.filter((target) => target.channel === 'web').map((target) => target.token);
-  if (webTokens.length === 0) {
-    return;
-  }
-
-  const response = await messaging.sendEachForMulticast({
-    tokens: webTokens,
-    notification: {
-      title: payload.title,
-      body: payload.body,
-    },
-    data: payload.data,
-    webpush: {
-      notification: {
-        title: payload.title,
-        body: payload.body,
-      },
-      fcmOptions: {
-        link: payload.data?.deepLink ?? 'https://bethelconnect-user.web.app',
-      },
-    },
-  });
-
-  logger.info('Sent web notifications', { successCount: response.successCount, failureCount: response.failureCount, type: payload.type });
-}
-
 async function sendExpoNotifications(targets: DeviceTarget[], payload: NotificationPayload) {
-  const expoTokens = targets.filter((target) => target.channel === 'expo').map((target) => target.token);
+  const expoTokens = targets.map((target) => target.token);
   if (expoTokens.length === 0) {
     return;
   }
@@ -131,10 +102,7 @@ async function deliverNotification(targets: DeviceTarget[], payload: Notificatio
     return;
   }
 
-  await Promise.all([
-    sendWebNotifications(targets, payload),
-    sendExpoNotifications(targets, payload),
-  ]);
+  await sendExpoNotifications(targets, payload);
   await writeNotificationLog(payload);
 }
 
@@ -164,7 +132,7 @@ export const notifyOnApprovalChange = onDocumentUpdated('users/{userId}', async 
     type: 'approval-status',
     title: afterStatus === 'approved' ? 'Church access approved' : 'Access request updated',
     body: afterStatus === 'approved'
-      ? 'Your church request has been approved. Sign in to complete phone verification and open your member space.'
+      ? 'Your church request has been approved. Sign in to open your member space.'
       : 'Your access request was updated by the church admin. Sign in to review the next steps.',
     audienceUserId: userId,
     audienceChurchId: churchId || null,

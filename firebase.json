@@ -7,13 +7,21 @@
     "indexes": "firebase/firestore.indexes.json"
   },
   "hosting": {
-    "public": "church-network-admin/dist",
+    "public": "hosting",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/admin",
+        "destination": "/admin/index.html"
+      },
+      {
+        "source": "/admin/**",
+        "destination": "/admin/index.html"
+      },
       {
         "source": "**",
         "destination": "/index.html"
