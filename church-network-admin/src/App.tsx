@@ -65,7 +65,7 @@ import type {
   VolunteerAssignment,
 } from './types';
 
-type ViewKey = 'overview' | 'approvals' | 'members' | 'planning' | 'updates' | 'churches' | 'roles' | 'help';
+type ViewKey = 'overview' | 'approvals' | 'memberSetup' | 'members' | 'planning' | 'updates' | 'churches' | 'roles' | 'help';
 
 type CommonMeetingOccurrence = {
   key: string;
@@ -139,6 +139,8 @@ type ManagedMemberForm = {
   teamNames: string[];
 };
 
+type EventWindowFilter = 'thisWeek' | 'nextWeek' | 'all';
+
 type ChurchEditDraft = {
   name: string;
   city: string;
@@ -174,7 +176,8 @@ type ArchivedServicePlan = {
 const navigation = [
   { key: 'overview', label: 'Overview' },
   { key: 'approvals', label: 'Approval Queue' },
-  { key: 'members', label: 'Members' },
+  { key: 'memberSetup', label: 'Add Members and Teams' },
+  { key: 'members', label: 'Manage Members' },
   { key: 'planning', label: 'Team Planning' },
   { key: 'updates', label: 'Announcements and Events' },
   { key: 'churches', label: 'Churches And Teams' },
@@ -182,10 +185,14 @@ const navigation = [
   { key: 'help', label: 'Help' },
 ] as const;
 
+const elevatedMemberRoleOptions: RoleKey[] = ['member', 'volunteer', 'teamLeader', 'pastor', 'churchAdmin'];
+const pastorManagedRoleOptions: RoleKey[] = ['member', 'volunteer', 'teamLeader'];
+
 const viewTitle: Record<ViewKey, string> = {
   overview: 'Overview',
   approvals: 'Approval Queue',
-  members: 'Members',
+  memberSetup: 'Add Members and Teams',
+  members: 'Manage Members',
   planning: 'Team Planning',
   updates: 'Announcements and Events',
   churches: 'Churches And Teams',
@@ -196,6 +203,7 @@ const viewTitle: Record<ViewKey, string> = {
 const viewSummary: Record<ViewKey, string> = {
   overview: 'Track church readiness, member activity, ministry planning, and urgent actions from one shared control room.',
   approvals: 'Review new requests church by church and keep onboarding clear for local admins and leaders.',
+  memberSetup: 'Create managed member profiles and shape the team structure for the selected church.',
   members: 'Manage approved members, their effective role, and the teams they serve in for each church.',
   planning: 'Shape Sunday service flow, assign one person per role, and archive completed Sundays for later review.',
   updates: 'Publish local announcements and manage church-specific and common events for the selected church.',
@@ -211,11 +219,12 @@ const adminHelpSections = [
     body: 'Bethel Admin Connect is the operating workspace for church onboarding, member management, Sunday planning, prayer moderation, announcements, events, and church setup. Everything follows the selected church scope unless you are working with a common network event.',
     bullets: [
       'Use Overview for a quick operational picture of the selected church.',
-      'Use Approval Queue for new member requests and prayer moderation.',
-      'Use Members to manage approved members, roles, teams, and email details.',
+      'Use Approval Queue for new member requests and prayer moderation when your role includes approval rights.',
+      'Use Add Members and Teams to create managed member profiles and shape team structure if you are a church admin or pastor.',
+      'Use Manage Members to manage approved members, roles, teams, and contact details when your role includes member-management rights.',
       'Use Team Planning to plan Sunday service roles, assign one person per role, and review archived Sundays.',
       'Use Announcements and Events to publish communication and manage church-specific or common events.',
-      'Use Churches And Teams to maintain church contact details, meeting times, and ministry structure.',
+      'Use Churches And Teams only as a super admin to maintain church contact details, meeting times, and ministry structure.',
     ],
   },
   {
@@ -224,8 +233,8 @@ const adminHelpSections = [
     body: 'A clean daily workflow keeps the system accurate and avoids duplicate work.',
     bullets: [
       'Start in Overview to check the next upcoming event, approvals waiting, prayer requests, and member follow-up.',
-      'Open Approval Queue next to review new access requests and prayer requests that need moderation.',
-      'Move to Members to confirm approved people have the correct role, team access, and email address.',
+      'Open Approval Queue next to review new access requests and prayer requests that need moderation if your role includes that section.',
+      'Move to Add Members and Teams or Manage Members to confirm approved people have the correct role, team access, and contact information.',
       'Use Team Planning to confirm Sunday assignments and archive history.',
       'Finish in Announcements and Events to publish updates, meetings, and event changes for members.',
     ],
@@ -236,20 +245,30 @@ const adminHelpSections = [
     body: 'Approval Queue combines onboarding and moderated prayer flow so admins can handle both in one place.',
     bullets: [
       'Access requests are routed by the church selected by the member in the user app.',
-      'Approving a request creates approved member access. Role elevation can then be handled in Members.',
+      'Approving a request creates approved member access. Role elevation can then be handled in Manage Members.',
       'Prayer requests appear in their own moderation tile below approvals.',
       'Super Admins and Church Admins can approve, hide, or remove prayer requests.',
       'Once a prayer request is approved, it appears on the Prayer Wall for members in that church.',
     ],
   },
   {
-    kicker: 'Members',
+    kicker: 'Setup',
+    title: 'How Add Members and Teams should be used',
+    body: 'Add Members and Teams separates structural setup from ongoing member administration so planning stays cleaner.',
+    bullets: [
+      'Create a managed member profile here when leadership needs to add someone directly instead of waiting for a request flow.',
+      'Use Team setup here to add or remove teams and roles used later in Sunday planning.',
+      'This section is visible for church admins and pastors, but not for team leaders.',
+    ],
+  },
+  {
+    kicker: 'Manage Members',
     title: 'How member management works',
-    body: 'Members is the place to maintain approved people after access is granted.',
+    body: 'Manage Members is the place to maintain approved people after access is granted.',
     bullets: [
       'Use search and filters to narrow members by name, role, team, and readiness.',
-      'Use Edit on a member tile to update email, role, and team assignments together.',
-      'Managed members can also be created directly from this section when needed.',
+      'Use Edit on a member tile to update email, mobile number, role, and team assignments together.',
+      'Deleting a member removes their member access, and the app now asks for confirmation before deletion.',
       'Roles control permission level. Teams control planning visibility and service participation.',
       'For security, approval only grants member access by default. Elevated roles should be assigned here intentionally.',
     ],
@@ -259,12 +278,13 @@ const adminHelpSections = [
     title: 'How Sunday planning should be used',
     body: 'Team Planning is designed to assign one person per role for each Sunday activity.',
     bullets: [
-      'Set up teams and roles first in Team Setup.',
-      'Use the Sunday service order to decide the activity flow.',
+      'Set up teams and roles first in Add Members and Teams if your role includes setup rights.',
+      'Super admins, church admins, and pastors can change the Sunday service order. Team leaders can plan activities but cannot change the service order.',
       'Open the activity planner for a Sunday and assign one person per role slot.',
-      'Confirm activity plan once. The system now prevents duplicate requests for the same person in the same role.',
-      'If a person is reassigned or an assignment is removed, the member flow is updated accordingly.',
-      'Use Archived Sundays to load previous Sundays and compare service history.',
+      'On mobile, the planner uses a tap-to-assign flow instead of relying on drag and drop.',
+      'Team leaders can see a My team members card inside Team Planning so they can plan using people from their own teams.',
+      'Confirm activity plan once. The system now prevents duplicate requests for the same person in the same role and shows Activity planned when the current draft is already saved.',
+      'Use Archived Sundays to load previous Sundays and review service history.',
     ],
   },
   {
@@ -274,10 +294,11 @@ const adminHelpSections = [
     bullets: [
       'Announcements can be published for a set duration or until a chosen date.',
       'Expired announcements are automatically hidden from the user app.',
-      'Events can be published as common Bethel events or church-specific events.',
+      'Super admins can publish both common Bethel events and church-specific events. Church admins and pastors can publish church-specific events only.',
       'Common events appear across all churches. Church-specific events appear only for the selected church.',
-      'Default meetings and Sunday service also flow into the user calendar and can be deleted per instance when needed.',
-      'Published items can be deleted from the lower management tiles.',
+      'Default meetings and Sunday service also flow into the user calendar and can be cancelled per instance when needed.',
+      'The lower Church specific events and Common events sections include filters for This week, Next week, and All events.',
+      'Published items now use cancel actions, and common published events can only be cancelled by super admins.',
     ],
   },
   {
@@ -289,6 +310,7 @@ const adminHelpSections = [
       'Social links and support contacts entered here flow into the user app experience.',
       'Team structure in this area supports planning, member assignment, and event scoping.',
       'If the church service time changes, related Sunday service calendar behavior updates from this source.',
+      'This section is visible only for super admins.',
     ],
   },
   {
@@ -297,9 +319,9 @@ const adminHelpSections = [
     body: 'The dashboard behavior depends on the signed-in admin role.',
     bullets: [
       'Super Admin has cross-church visibility and full control.',
-      'Church Admin manages approvals, members, planning, events, prayer moderation, and church setup for their church.',
-      'Pastor can assist with member and planning workflows where permitted, but not every destructive moderation action.',
-      'Team Leader is limited to their teams in planning-related areas.',
+      'Church Admin manages approvals, members, planning, events, prayer moderation, and Add Members and Teams for their church.',
+      'Pastor now follows the same practical admin privileges as church admin inside the dashboard, except that Churches And Teams remains super-admin only.',
+      'Team Leader is limited to planning-related areas for their teams and does not see Approval Queue, Add Members and Teams, or Manage Members.',
       'The Role Matrix page is a reference guide only. Real enforcement is handled by the app logic and Firestore rules.',
     ],
   },
@@ -914,6 +936,10 @@ function getHighestRole(roleFlags: Record<string, unknown> | undefined, teamName
   return teamNames.length > 0 ? 'volunteer' : 'member';
 }
 
+function hasDashboardPermissionForRole(roleKey: RoleKey): boolean {
+  return roleKey === 'networkSuperAdmin' || roleKey === 'churchAdmin' || roleKey === 'pastor' || roleKey === 'teamLeader';
+}
+
 function normalizeMemberRole(selectedRole: RoleKey, teamNames: string[]) {
   if (selectedRole === 'networkSuperAdmin' || selectedRole === 'churchAdmin' || selectedRole === 'pastor' || selectedRole === 'teamLeader') {
     return selectedRole;
@@ -1012,6 +1038,20 @@ function buildPlanningConflictSignature(
           && assignment.roleName === requirement.roleName,
         )
         .map((assignment) => `${requirement.id}:${assignment.id}:${assignment.assignedUserId ?? assignment.assignedTo}:${assignment.responseStatus}`),
+    )
+    .sort()
+    .join('|');
+}
+
+function buildPlanningDraftSignature(
+  draftAssignments: Record<string, PlanningDraftItem[]>,
+  requirements: ServiceRequirement[],
+) {
+  return requirements
+    .flatMap((requirement) =>
+      (draftAssignments[requirement.id] ?? []).slice(0, 1).map((item) =>
+        `${requirement.id}:${item.assignedUserId ?? item.assignedTo.trim().toLowerCase()}`,
+      ),
     )
     .sort()
     .join('|');
@@ -1201,6 +1241,53 @@ function formatDateTimeRange(startAt: string, endAt: string) {
   return `${dayLabel} | ${startTime} - ${endTime}`;
 }
 
+function getWeekWindow(filter: EventWindowFilter, referenceDate = new Date()) {
+  if (filter === 'all') {
+    return null;
+  }
+
+  const weekStart = new Date(referenceDate);
+  weekStart.setHours(0, 0, 0, 0);
+  const day = weekStart.getDay();
+  const offsetToMonday = day === 0 ? -6 : 1 - day;
+  weekStart.setDate(weekStart.getDate() + offsetToMonday + (filter === 'nextWeek' ? 7 : 0));
+
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  return { start: weekStart.getTime(), end: weekEnd.getTime() };
+}
+
+function matchesEventWindow(startAt: string, filter: EventWindowFilter) {
+  const window = getWeekWindow(filter);
+  if (!window) {
+    return true;
+  }
+
+  const eventStart = new Date(startAt).getTime();
+  return Number.isFinite(eventStart) && eventStart >= window.start && eventStart < window.end;
+}
+
+function getAccessRequestRecencyValue(request: AccessRequest) {
+  const parsedRequestedAt = Date.parse(request.requestedAt);
+  if (!Number.isNaN(parsedRequestedAt)) {
+    return parsedRequestedAt;
+  }
+
+  if (request.status === 'pending') {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  if (request.status === 'approved') {
+    return Number.MAX_SAFE_INTEGER - 1;
+  }
+
+  if (request.status === 'rejected') {
+    return Number.MAX_SAFE_INTEGER - 2;
+  }
+
+  return 0;
+}
+
 function readPosterFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -1229,8 +1316,9 @@ function App() {
   });
   const [authError, setAuthError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isResolvingAdminProfile, setIsResolvingAdminProfile] = useState(false);
   const [churches, setChurches] = useState<Church[]>(mockChurches);
-  const [selectedChurchId, setSelectedChurchId] = useState(mockChurches[0]?.id ?? '');
+  const [selectedChurchId, setSelectedChurchId] = useState('');
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>(mockAccessRequests);
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>(mockPrayerRequests);
   const [announcements, setAnnouncements] = useState<ChurchAnnouncement[]>(mockAnnouncements);
@@ -1254,7 +1342,7 @@ function App() {
   const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'unassigned-team'>('all');
   const [memberSortKey, setMemberSortKey] = useState<'name' | 'role' | 'team' | 'status'>('name');
   const [memberEditId, setMemberEditId] = useState<string | null>(null);
-  const [memberEditDrafts, setMemberEditDrafts] = useState<Record<string, { email: string; roleKey: RoleKey; teamNames: string[] }>>({});
+  const [memberEditDrafts, setMemberEditDrafts] = useState<Record<string, { email: string; phoneNumber: string; roleKey: RoleKey; teamNames: string[] }>>({});
   const [newTeamName, setNewTeamName] = useState('');
   const [newRoleForm, setNewRoleForm] = useState<{ teamName: string; roleName: string }>({ teamName: defaultTeams[1], roleName: '' });
   const [expandedTeamName, setExpandedTeamName] = useState<string>('');
@@ -1268,15 +1356,18 @@ function App() {
   const [planningDraftAssignments, setPlanningDraftAssignments] = useState<Record<string, PlanningDraftItem[]>>({});
   const [planningGuestInputs, setPlanningGuestInputs] = useState<Record<string, string>>({});
   const [draggedPlanningMemberId, setDraggedPlanningMemberId] = useState<string | null>(null);
+  const [selectedPlanningMemberId, setSelectedPlanningMemberId] = useState<string | null>(null);
+  const [isCompactAdminView, setIsCompactAdminView] = useState<boolean>(() => (typeof window !== 'undefined' ? window.innerWidth <= 720 : false));
   const [planningBaselineSignature, setPlanningBaselineSignature] = useState('');
   const [expandedActivityKeys, setExpandedActivityKeys] = useState<Record<string, boolean>>({});
   const [isEditingServiceOrder, setIsEditingServiceOrder] = useState(false);
+  const [serviceOrderDraft, setServiceOrderDraft] = useState<ServiceActivity[] | null>(null);
   const [archivedPlans, setArchivedPlans] = useState<ArchivedServicePlan[]>([]);
   const [selectedArchiveSunday, setSelectedArchiveSunday] = useState('');
   const [loadedArchivePlan, setLoadedArchivePlan] = useState<ArchivedServicePlan | null>(null);
-  const [compareArchiveSunday, setCompareArchiveSunday] = useState('');
   const [expandedArchiveActivityKeys, setExpandedArchiveActivityKeys] = useState<Record<string, boolean>>({});
   const archiveDetailRef = useRef<HTMLDivElement | null>(null);
+  const activityPlannerRef = useRef<HTMLDivElement | null>(null);
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
     body: '',
@@ -1284,6 +1375,8 @@ function App() {
     visibilityMode: '7days' as AnnouncementVisibilityMode,
     visibleUntilDate: toLocalDateInputValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
   });
+  const [churchSpecificEventFilter, setChurchSpecificEventFilter] = useState<EventWindowFilter>('all');
+  const [commonEventFilter, setCommonEventFilter] = useState<EventWindowFilter>('all');
   const [eventForm, setEventForm] = useState({
     scopeType: 'church' as 'church' | 'network',
     title: '',
@@ -1324,7 +1417,13 @@ function App() {
     [selectedChurchRoleConfigs, selectedChurchTeams],
   );
   const selectedChurchServiceOrder = selectedChurch ? serviceOrderByChurch[selectedChurch.id] ?? getDefaultServiceOrder(selectedChurch.id) : [];
-  const scopedRequests = useMemo(() => accessRequests.filter((request) => !selectedChurch || request.churchId === selectedChurch.id), [accessRequests, selectedChurch]);
+  const visibleServiceOrder = isEditingServiceOrder && serviceOrderDraft ? serviceOrderDraft : selectedChurchServiceOrder;
+  const scopedRequests = useMemo(
+    () => accessRequests.filter((request) =>
+      adminProfile.roleKey === 'networkSuperAdmin' || !selectedChurch || request.churchId === selectedChurch.id
+    ),
+    [accessRequests, adminProfile.roleKey, selectedChurch],
+  );
   const scopedPrayerRequests = useMemo(() => prayerRequests.filter((request) => !selectedChurch || request.churchId === selectedChurch.id), [prayerRequests, selectedChurch]);
   const scopedAnnouncements = useMemo(() => announcements.filter((announcement) => !selectedChurch || announcement.churchId === selectedChurch.id), [announcements, selectedChurch]);
   const activeScopedAnnouncements = useMemo(() => scopedAnnouncements.filter(isAnnouncementActive), [scopedAnnouncements]);
@@ -1346,12 +1445,23 @@ function App() {
   const scopedAssignments = useMemo(() => assignments.filter((assignment) => !selectedChurch || assignment.churchId === selectedChurch.id), [assignments, selectedChurch]);
   const filteredRequests = useMemo(() => {
     const searchTerm = approvalSearch.trim().toLowerCase();
-    return scopedRequests.filter((request) => {
+    const latestRequests = Array.from(
+      scopedRequests.reduce<Map<string, AccessRequest>>((requestMap, request) => {
+        const requestKey = request.uid?.trim() || request.email.trim().toLowerCase() || request.id;
+        const existingRequest = requestMap.get(requestKey);
+        if (!existingRequest || getAccessRequestRecencyValue(request) >= getAccessRequestRecencyValue(existingRequest)) {
+          requestMap.set(requestKey, request);
+        }
+        return requestMap;
+      }, new Map()),
+    ).map(([, request]) => request);
+
+    return latestRequests.filter((request) => {
       const matchesSearch = !searchTerm || [request.fullName, request.email, request.note].some((value) => value.toLowerCase().includes(searchTerm));
-      const matchesStatus = approvalStatusFilter === 'all' || request.status === approvalStatusFilter;
-      const matchesRole = approvalRoleFilter === 'all' || request.requestedRoles.includes(approvalRoleFilter);
-      return matchesSearch && matchesStatus && matchesRole;
-    });
+        const matchesStatus = approvalStatusFilter === 'all' || request.status === approvalStatusFilter;
+        const matchesRole = approvalRoleFilter === 'all' || request.requestedRoles.includes(approvalRoleFilter);
+        return matchesSearch && matchesStatus && matchesRole;
+    }).sort((left, right) => getAccessRequestRecencyValue(right) - getAccessRequestRecencyValue(left));
   }, [approvalRoleFilter, approvalSearch, approvalStatusFilter, scopedRequests]);
   const visibleMemberRecords = useMemo(() => {
     const searchTerm = memberSearch.trim().toLowerCase();
@@ -1388,17 +1498,41 @@ function App() {
     ?? filteredRequests[0]
     ?? accessRequests.find((request) => request.id === selectedRequestId)
     ?? null;
-  const canManagePlanningStructure = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
-  const canPlanAllTeams = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canManagePlanningStructure = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canEditServiceOrder = canManagePlanningStructure;
+  const canPlanAllTeams = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canExportArchive = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canReviewApprovals = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
-  const canModeratePrayer = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
-  const canManageCommonMeetings = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canModeratePrayer = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canManageCommonMeetings = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canManageMembers = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
-  const canDeleteMembers = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
-  const canEditChurch = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canDeleteMembers = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canEditChurch = adminProfile.roleKey === 'networkSuperAdmin';
   const canPublishUpdates = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
-  const canPublishEvents = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin';
+  const canPublishEvents = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canPublishCommonEvents = adminProfile.roleKey === 'networkSuperAdmin';
+  const effectiveEventScopeType = canPublishCommonEvents ? eventForm.scopeType : 'church';
+  const canAccessMemberSetup = adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canCancelPublishedEvent = (event: ChurchEventItem) =>
+    event.scopeType === 'network' || event.churchId === 'network'
+      ? adminProfile.roleKey === 'networkSuperAdmin'
+      : canPublishEvents;
+  const memberRoleOptions = elevatedMemberRoleOptions;
+  const visibleNavigation = useMemo(
+    () => navigation.filter((item) => {
+      if (adminProfile.roleKey === 'teamLeader' && (item.key === 'approvals' || item.key === 'members')) {
+        return false;
+      }
+      if (item.key === 'churches') {
+        return adminProfile.roleKey === 'networkSuperAdmin';
+      }
+      if (item.key === 'memberSetup') {
+        return canAccessMemberSetup;
+      }
+      return true;
+    }),
+    [adminProfile.roleKey, canAccessMemberSetup],
+  );
   const upcomingPlanningSundays = useMemo(() => getUpcomingSundayDates(2), []);
   const archivedPlanningSundays = useMemo(() => getPastSundayDates(260), []);
   const planningActivityOptions = useMemo(() => buildPlanningActivityOptions(selectedChurchServiceOrder), [selectedChurchServiceOrder]);
@@ -1439,6 +1573,95 @@ function App() {
 
     return scopedMembers.filter((member) => member.teamNames.some((teamName) => relevantTeams.has(teamName)));
   }, [planningForm.allowOtherMembers, scopedMembers, selectedPlanningRequirements]);
+  const selectedPlanningMember = useMemo(
+    () => visibleMembers.find((member) => member.id === selectedPlanningMemberId) ?? null,
+    [selectedPlanningMemberId, visibleMembers],
+  );
+  const managedTeamMembers = useMemo(
+    () => scopedMembers
+      .filter((member) => member.teamNames.some((teamName) => adminProfile.teamNames.includes(teamName)))
+      .sort((left, right) => left.fullName.localeCompare(right.fullName)),
+    [adminProfile.teamNames, scopedMembers],
+  );
+  const savedPlanningDraftSignature = useMemo(
+    () =>
+      buildPlanningDraftSignature(
+        selectedPlanningRequirements.reduce<Record<string, PlanningDraftItem[]>>((drafts, requirement) => {
+          const existingAssignments = getAssignmentsForRequirement(scopedAssignments, planningForm.serviceDate, requirement);
+          drafts[requirement.id] = existingAssignments.slice(0, 1).map((assignment) => ({
+            assignedTo: assignment.assignedTo,
+            assignedUserId: assignment.assignedUserId,
+          }));
+          return drafts;
+        }, {}),
+        selectedPlanningRequirements,
+      ),
+    [planningForm.serviceDate, scopedAssignments, selectedPlanningRequirements],
+  );
+  const currentPlanningDraftSignature = useMemo(
+    () => buildPlanningDraftSignature(planningDraftAssignments, selectedPlanningRequirements),
+    [planningDraftAssignments, selectedPlanningRequirements],
+  );
+  const planningHasAssignments = currentPlanningDraftSignature.length > 0;
+  const planningHasUnsavedChanges = currentPlanningDraftSignature !== savedPlanningDraftSignature;
+  const suggestionMapByRequirement = useMemo(() => {
+    const memberById = new Map(visibleMembers.map((member) => [member.id, member]));
+    const archivedSuggestionEntries = archivedPlans
+      .flatMap((plan) =>
+        plan.activities.flatMap((activity) =>
+          activity.roles.flatMap((role) =>
+            role.assignments.map((assignment) => ({
+              serviceDate: plan.serviceDate,
+              teamName: activity.teamName,
+              roleName: role.roleName,
+              assignedUserId: assignment.assignedUserId,
+              assignedTo: assignment.assignedTo,
+            })),
+          ),
+        ),
+      );
+    const liveSuggestionEntries = scopedAssignments
+      .filter((assignment) => assignment.serviceDate !== planningForm.serviceDate)
+      .map((assignment) => ({
+        serviceDate: assignment.serviceDate,
+        teamName: assignment.teamName,
+        roleName: assignment.roleName,
+        assignedUserId: assignment.assignedUserId,
+        assignedTo: assignment.assignedTo,
+      }));
+    const allSuggestionEntries = [...liveSuggestionEntries, ...archivedSuggestionEntries].sort((left, right) => right.serviceDate.localeCompare(left.serviceDate));
+
+    return selectedPlanningRequirements.reduce<Record<string, MemberRecord[]>>((result, requirement) => {
+      const seenMemberIds = new Set<string>();
+      const suggestions: MemberRecord[] = [];
+      allSuggestionEntries.forEach((entry) => {
+        if (
+          suggestions.length >= 3
+          || entry.teamName !== requirement.teamName
+          || entry.roleName !== requirement.roleName
+          || !entry.assignedUserId
+          || seenMemberIds.has(entry.assignedUserId)
+        ) {
+          return;
+        }
+        const member = memberById.get(entry.assignedUserId);
+        if (!member) {
+          return;
+        }
+        const canUseMember =
+          requirement.teamName === 'Service Flow'
+          || planningForm.allowOtherMembers
+          || member.teamNames.includes(requirement.teamName);
+        if (!canUseMember) {
+          return;
+        }
+        seenMemberIds.add(entry.assignedUserId);
+        suggestions.push(member);
+      });
+      result[requirement.id] = suggestions;
+      return result;
+    }, {});
+  }, [archivedPlans, planningForm.allowOtherMembers, planningForm.serviceDate, scopedAssignments, selectedPlanningRequirements, visibleMembers]);
   const sundayAssignments = useMemo(
     () => scopedAssignments.filter((assignment) => assignment.serviceDate === selectedPlanningSunday),
     [scopedAssignments, selectedPlanningSunday],
@@ -1465,6 +1688,22 @@ function App() {
   const upcomingChurchSpecificMeetings = useMemo(
     () => selectedChurch ? buildUpcomingChurchSpecificMeetingOccurrences(selectedChurch, churchSpecificMeetingCancellationKeys, 8) : [],
     [churchSpecificMeetingCancellationKeys, selectedChurch],
+  );
+  const filteredUpcomingChurchSpecificMeetings = useMemo(
+    () => upcomingChurchSpecificMeetings.filter((meeting) => matchesEventWindow(meeting.startAt, churchSpecificEventFilter)),
+    [churchSpecificEventFilter, upcomingChurchSpecificMeetings],
+  );
+  const filteredScopedChurchSpecificEvents = useMemo(
+    () => scopedChurchSpecificEvents.filter((event) => matchesEventWindow(event.startAt, churchSpecificEventFilter)),
+    [churchSpecificEventFilter, scopedChurchSpecificEvents],
+  );
+  const filteredUpcomingCommonMeetings = useMemo(
+    () => upcomingCommonMeetings.filter((meeting) => matchesEventWindow(meeting.startAt, commonEventFilter)),
+    [commonEventFilter, upcomingCommonMeetings],
+  );
+  const filteredScopedCommonEvents = useMemo(
+    () => scopedCommonEvents.filter((event) => matchesEventWindow(event.startAt, commonEventFilter)),
+    [commonEventFilter, scopedCommonEvents],
   );
   const nextEvent = useMemo(() => {
     if (!selectedChurch) {
@@ -1517,15 +1756,26 @@ function App() {
       })
       .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())[0] ?? null;
   }, [scopedEvents, selectedChurch, upcomingChurchSpecificMeetings, upcomingCommonMeetings]);
-  const archiveComparisonPlan = useMemo(
-    () => archivedPlans.find((plan) => plan.serviceDate === compareArchiveSunday) ?? null,
-    [archivedPlans, compareArchiveSunday],
-  );
+  useEffect(() => {
+    if (!visibleNavigation.some((item) => item.key === activeView)) {
+      setActiveView('overview');
+    }
+  }, [activeView, visibleNavigation]);
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
 
+    const updateCompactAdminView = () => setIsCompactAdminView(window.innerWidth <= 720);
+    updateCompactAdminView();
+    window.addEventListener('resize', updateCompactAdminView);
+    return () => window.removeEventListener('resize', updateCompactAdminView);
+  }, []);
   useEffect(() => {
     return onAdminAuthChanged((session) => {
       setAdminSession(session);
       if (!session && isFirebaseConfigured) {
+        setIsResolvingAdminProfile(false);
         setAdminProfile({
           hasDashboardPermission: false,
           roleKey: 'member',
@@ -1544,6 +1794,9 @@ function App() {
     let active = true;
 
     async function loadProfile() {
+      if (active) {
+        setIsResolvingAdminProfile(true);
+      }
       if (!isFirebaseConfigured || !firestoreDb) {
         if (!active) {
           return;
@@ -1554,6 +1807,7 @@ function App() {
           churchIds: mockChurches.map((church) => church.id),
           teamNames: defaultTeams as unknown as string[],
         });
+        setIsResolvingAdminProfile(false);
         return;
       }
 
@@ -1572,16 +1826,35 @@ function App() {
         .filter(([, enabled]) => enabled === true)
         .map(([teamName]) => teamName);
       const roleKey = getHighestRole(data.roleFlags as Record<string, unknown> | undefined, teamAccess);
+      const hasDashboardPermission = hasDashboardPermissionForRole(roleKey);
       if (!active) {
         return;
       }
 
+      if (!hasDashboardPermission) {
+        await signOutAdmin();
+        if (!active) {
+          return;
+        }
+        setAdminSession(null);
+        setAdminProfile({
+          hasDashboardPermission: false,
+          roleKey: 'member',
+          churchIds: [],
+          teamNames: [],
+        });
+        setIsResolvingAdminProfile(false);
+        setAuthError('This Google account does not have admin access. Only super admins, church admins, pastors, and team leaders can sign in to Bethel Connect Admin.');
+        return;
+      }
+
       setAdminProfile({
-        hasDashboardPermission: roleKey === 'networkSuperAdmin' || roleKey === 'churchAdmin' || roleKey === 'teamLeader' || roleKey === 'pastor',
+        hasDashboardPermission: hasDashboardPermission,
         roleKey,
         churchIds: roleKey === 'networkSuperAdmin' ? mockChurches.map((church) => church.id) : churchAccess,
         teamNames: teamAccess,
       });
+      setIsResolvingAdminProfile(false);
     }
 
     void loadProfile();
@@ -1621,6 +1894,11 @@ function App() {
   }, [selectedChurch]);
 
   useEffect(() => {
+    setIsEditingServiceOrder(false);
+    setServiceOrderDraft(null);
+  }, [selectedChurch?.id]);
+
+  useEffect(() => {
     if (!selectedChurch) {
       return;
     }
@@ -1633,9 +1911,10 @@ function App() {
 
   useEffect(() => {
     const activeChurchId = selectedChurch?.id ?? null;
-    const unsubscribeRequests = subscribeToAccessRequests(activeChurchId, setAccessRequests, () => setAccessRequests(mockAccessRequests));
+    const accessRequestScopeChurchId = adminProfile.roleKey === 'networkSuperAdmin' ? null : activeChurchId;
+    const unsubscribeRequests = subscribeToAccessRequests(accessRequestScopeChurchId, setAccessRequests, () => setAccessRequests(mockAccessRequests));
     const unsubscribePrayers = subscribeToPrayerRequests(activeChurchId, setPrayerRequests, () => setPrayerRequests(mockPrayerRequests));
-    const unsubscribeMembers = subscribeToMembers(activeChurchId, setMembers, () => setMembers(mockMembers));
+    const unsubscribeMembers = subscribeToMembers(activeChurchId, setMembers, () => setMembers([]));
     const unsubscribeAnnouncements = activeChurchId
       ? subscribeToAnnouncements(activeChurchId, setAnnouncements, () => setAnnouncements(mockAnnouncements))
       : () => undefined;
@@ -1660,7 +1939,7 @@ function App() {
       unsubscribeChurchSpecificMeetingCancellations();
       unsubscribeAssignments();
     };
-  }, [selectedChurch?.id]);
+  }, [adminProfile.roleKey, selectedChurch?.id]);
 
   useEffect(() => {
     if (!selectedChurch?.id) {
@@ -1717,7 +1996,21 @@ function App() {
   }, [archivedPlanningSundays, assignments, roleConfigsByChurch, selectedChurch, serviceOrderByChurch]);
 
   const allowedChurchIds = adminProfile.roleKey === 'networkSuperAdmin' ? churches.map((church) => church.id) : adminProfile.churchIds;
-  const scopeChurchChoices = churches.filter((church) => allowedChurchIds.length === 0 || allowedChurchIds.includes(church.id));
+  const scopeChurchChoices = useMemo(() => {
+    if (
+      isFirebaseConfigured
+      && adminSession
+      && adminProfile.roleKey !== 'networkSuperAdmin'
+      && adminProfile.churchIds.length === 0
+    ) {
+      return [];
+    }
+
+    return churches.filter((church) => allowedChurchIds.length === 0 || allowedChurchIds.includes(church.id));
+  }, [adminProfile.churchIds.length, adminProfile.roleKey, adminSession, allowedChurchIds, churches]);
+  const mobileAdminTitle = adminProfile.roleKey === 'networkSuperAdmin'
+    ? 'Bethel Connect Admin'
+    : selectedChurch?.name ?? 'Bethel Connect Admin';
 
   useEffect(() => {
     if (!selectedChurchId && scopeChurchChoices[0]?.id) {
@@ -1866,7 +2159,7 @@ function App() {
 
   const handleModeratePrayer = async (requestId: string, nextStatus: 'approved' | 'hidden') => {
     if (!canModeratePrayer) {
-      setUpdateMessage('Only super admins and church admins can moderate prayer requests.');
+      setUpdateMessage('Only super admins, church admins, and pastors can moderate prayer requests.');
       return;
     }
 
@@ -1883,7 +2176,7 @@ function App() {
 
   const handleRemovePrayerRequest = async (requestId: string) => {
     if (!canModeratePrayer) {
-      setUpdateMessage('Only super admins and church admins can remove prayer requests.');
+      setUpdateMessage('Only super admins, church admins, and pastors can remove prayer requests.');
       return;
     }
 
@@ -1956,6 +2249,7 @@ function App() {
       ...current,
       [member.id]: {
         email: member.email,
+        phoneNumber: member.phoneNumber ?? '',
         roleKey: member.roleKey,
         teamNames: member.teamNames,
       },
@@ -1984,6 +2278,7 @@ function App() {
           memberId: member.id,
           churchId: member.churchId,
           email: normalizedEmail,
+          phoneNumber: draft.phoneNumber,
           roleKey: effectiveRole,
           teamNames: draft.teamNames,
         });
@@ -1991,7 +2286,7 @@ function App() {
       setMembers((current) =>
         current.map((currentMember) =>
           currentMember.id === member.id
-            ? { ...currentMember, email: normalizedEmail, roleKey: effectiveRole, teamName: draft.teamNames[0] ?? '', teamNames: draft.teamNames }
+            ? { ...currentMember, email: normalizedEmail, phoneNumber: draft.phoneNumber.trim() || undefined, roleKey: effectiveRole, teamName: draft.teamNames[0] ?? '', teamNames: draft.teamNames }
             : currentMember,
         ),
       );
@@ -2002,7 +2297,7 @@ function App() {
         entityType: 'member',
         actionLabel: 'Updated member',
         targetLabel: member.fullName,
-        summary: `${adminSession?.email ?? 'Church admin'} updated the member email, role, and team assignments.`,
+        summary: `${adminSession?.email ?? 'Church admin'} updated the member email, mobile number, role, and team assignments.`,
         actor: adminSession?.email ?? 'Church admin',
       });
     } catch (error) {
@@ -2019,12 +2314,20 @@ function App() {
       return true;
     }
 
-    return member.roleKey !== 'networkSuperAdmin' && member.roleKey !== 'churchAdmin';
+    if (adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor') {
+      return member.roleKey !== 'networkSuperAdmin' && member.roleKey !== 'churchAdmin';
+    }
+
+    return false;
+  };
+
+  const canEditMemberRecord = (member: MemberRecord) => {
+    return canManageMembers;
   };
 
   const handleDeleteMember = async (member: MemberRecord) => {
     if (!canDeleteMembers) {
-      setUpdateMessage('Only super admins and church admins can delete members.');
+      setUpdateMessage('Only super admins, church admins, and pastors can delete members.');
       return;
     }
 
@@ -2034,8 +2337,15 @@ function App() {
     }
 
     if (!canDeleteMemberRecord(member)) {
-      setUpdateMessage('Church admins can delete member records, but not church admin or super admin profiles.');
+      setUpdateMessage('Church admins and pastors can delete member records, but not church admin or super admin profiles.');
       return;
+    }
+
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(`Are you sure you want to delete the member "${member.fullName}"?`);
+      if (!confirmed) {
+        return;
+      }
     }
 
     try {
@@ -2187,32 +2497,57 @@ function App() {
     });
   };
 
-  const handleMoveActivity = (activityId: string, direction: 'up' | 'down') => {
-    if (!selectedChurch || !canManagePlanningStructure) {
+  const handleToggleServiceOrderEditing = async () => {
+    if (!selectedChurch || !canEditServiceOrder) {
       return;
     }
-    setServiceOrderByChurch((current) => {
-      const serviceOrder = [...(current[selectedChurch.id] ?? getDefaultServiceOrder(selectedChurch.id))];
+
+    if (!isEditingServiceOrder) {
+      setServiceOrderDraft([...selectedChurchServiceOrder]);
+      setIsEditingServiceOrder(true);
+      setUpdateMessage(`You are editing the Sunday service order for ${selectedChurch.displayCity}. Use Up and Down, then click Done to save.`);
+      return;
+    }
+
+    const draftOrder = serviceOrderDraft ?? selectedChurchServiceOrder;
+    const hasChanged =
+      draftOrder.length !== selectedChurchServiceOrder.length
+      || draftOrder.some((activity, index) => activity.id !== selectedChurchServiceOrder[index]?.id);
+
+    if (hasChanged) {
+      setServiceOrderByChurch((current) => ({ ...current, [selectedChurch.id]: draftOrder }));
+      await appendAuditEntry({
+        churchId: selectedChurch.id,
+        entityType: 'planning',
+        actionLabel: 'Updated service order',
+        targetLabel: selectedChurch.displayCity,
+        summary: `${adminSession?.email ?? 'Church admin'} saved an updated Sunday service order for ${selectedChurch.displayCity}.`,
+        actor: adminSession?.email ?? 'Church admin',
+      });
+      setUpdateMessage(`Sunday service order saved for ${selectedChurch.displayCity}.`);
+    } else {
+      setUpdateMessage('No service-order changes needed saving.');
+    }
+
+    setIsEditingServiceOrder(false);
+    setServiceOrderDraft(null);
+  };
+
+  const handleMoveActivity = (activityId: string, direction: 'up' | 'down') => {
+    if (!selectedChurch || !canEditServiceOrder || !isEditingServiceOrder) {
+      return;
+    }
+    setServiceOrderDraft((current) => {
+      const serviceOrder = [...(current ?? selectedChurchServiceOrder)];
       const currentIndex = serviceOrder.findIndex((activity) => activity.id === activityId);
       const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
       if (currentIndex === -1 || nextIndex < 0 || nextIndex >= serviceOrder.length) {
-        return current;
+        return current ?? serviceOrder;
       }
       const [movedActivity] = serviceOrder.splice(currentIndex, 1);
       serviceOrder.splice(nextIndex, 0, movedActivity);
-      return { ...current, [selectedChurch.id]: serviceOrder };
+      return serviceOrder;
     });
-    const movedActivity = selectedChurchServiceOrder.find((activity) => activity.id === activityId);
-    if (movedActivity) {
-      void appendAuditEntry({
-        churchId: selectedChurch.id,
-        entityType: 'planning',
-        actionLabel: 'Reordered service activity',
-        targetLabel: movedActivity.activityName,
-        summary: `${adminSession?.email ?? 'Church admin'} moved ${movedActivity.activityName} ${direction} in the Sunday service order.`,
-        actor: adminSession?.email ?? 'Church admin',
-      });
-    }
   };
 
   const openActivityPlanner = (serviceDate: string, activity: ServiceActivity, message?: string) => {
@@ -2220,9 +2555,13 @@ function App() {
     setSelectedPlanningSunday(serviceDate);
     setPlanningForm((current) => ({ ...current, serviceDate, activityKey }));
     setOpenedPlanningKey(`${serviceDate}:${activityKey}`);
+    setSelectedPlanningMemberId(null);
 
     const activitiesToPlan = selectedChurchServiceOrder.filter((entry) => getActivityPlanningKey(entry.activityName, entry.id) === activityKey);
     const requirements = buildRequirementsForActivities(activitiesToPlan, selectedChurchRoleConfigs);
+    const existingAssignmentCount = requirements.reduce((count, requirement) => (
+      count + (getAssignmentsForRequirement(scopedAssignments, serviceDate, requirement).length > 0 ? 1 : 0)
+    ), 0);
     setPlanningDraftAssignments(
       requirements.reduce<Record<string, PlanningDraftItem[]>>((drafts, requirement) => {
         const existingAssignment = getAssignmentsForRequirement(scopedAssignments, serviceDate, requirement)[0];
@@ -2233,13 +2572,18 @@ function App() {
       }, {}),
     );
     setPlanningBaselineSignature(buildPlanningConflictSignature(scopedAssignments, serviceDate, requirements));
-    setUpdateMessage(message ?? `Planning ${activity.activityName} for ${formatServiceDate(serviceDate)}. Drag the right people into the role slots, then confirm the plan.`);
+    const defaultMessage = existingAssignmentCount === 0
+      ? `Planning ${activity.activityName} for ${formatServiceDate(serviceDate)}. ${isCompactAdminView ? 'Tap a member, assign them to the right role, then confirm the plan.' : 'Drag the right people into the role slots, then confirm the plan.'}`
+      : existingAssignmentCount < requirements.length
+        ? `Continue planning ${activity.activityName} for ${formatServiceDate(serviceDate)}. ${existingAssignmentCount} of ${requirements.length} role${requirements.length === 1 ? '' : 's'} already ${existingAssignmentCount === 1 ? 'is' : 'are'} filled.`
+        : `Review or update ${activity.activityName} for ${formatServiceDate(serviceDate)}. All roles are already planned.`;
+    setUpdateMessage(message ?? defaultMessage);
   };
 
   const handleDropPlanningMember = (requirement: ServiceRequirement, memberId: string) => {
     const member = visibleMembers.find((item) => item.id === memberId);
     if (!member) {
-      return;
+      return false;
     }
 
     const canUseMember =
@@ -2248,23 +2592,39 @@ function App() {
       || member.teamNames.includes(requirement.teamName);
     if (!canUseMember) {
       setUpdateMessage(`${member.fullName} is outside ${requirement.teamName}. Turn on "Other member" first if you want to assign them here.`);
-      return;
+      return false;
     }
 
     const existingItem = (planningDraftAssignments[requirement.id] ?? [])[0];
     if (existingItem?.assignedUserId === member.id) {
       setUpdateMessage(`${member.fullName} is already planned for ${requirement.roleName}.`);
-      return;
+      return false;
     }
     if (existingItem) {
       setUpdateMessage(`Remove ${existingItem.assignedTo} from ${requirement.roleName} before adding another person.`);
-      return;
+      return false;
     }
 
     setPlanningDraftAssignments((current) => ({
       ...current,
       [requirement.id]: [{ assignedTo: member.fullName, assignedUserId: member.id }],
     }));
+    return true;
+  };
+
+  const handleSelectPlanningMember = (memberId: string) => {
+    setSelectedPlanningMemberId((current) => (current === memberId ? null : memberId));
+  };
+
+  const handleAssignSelectedPlanningMember = (requirement: ServiceRequirement) => {
+    if (!selectedPlanningMemberId) {
+      setUpdateMessage('Select a member first, then assign them to the role.');
+      return;
+    }
+
+    if (handleDropPlanningMember(requirement, selectedPlanningMemberId)) {
+      setSelectedPlanningMemberId(null);
+    }
   };
 
   const handleRemoveDraftAssignment = (requirementId: string) => {
@@ -2297,6 +2657,11 @@ function App() {
 
   const handleConfirmActivityPlan = async () => {
     if (!selectedChurch || !selectedPlanningActivity || !planningForm.serviceDate) {
+      return;
+    }
+
+    if (!planningHasUnsavedChanges && planningHasAssignments) {
+      setUpdateMessage(`${selectedPlanningActivity.label} is already planned for ${formatServiceDate(planningForm.serviceDate)}.`);
       return;
     }
 
@@ -2402,7 +2767,20 @@ function App() {
         return uniqueAssignments;
       }, []).sort((left, right) => left.serviceDate.localeCompare(right.serviceDate) || left.assignedTo.localeCompare(right.assignedTo)));
       setPlanningBaselineSignature(buildPlanningConflictSignature(nextAssignments, planningForm.serviceDate, selectedPlanningRequirements));
-      setUpdateMessage(`Confirmed ${selectedPlanningActivity.label} for ${formatServiceDate(planningForm.serviceDate)}.`);
+      setSelectedPlanningMemberId(null);
+      setOpenedPlanningKey(null);
+      setPlanningForm((current) => ({
+        ...current,
+        activityKey: '',
+        allowOtherMembers: false,
+      }));
+      setPlanningGuestInputs({});
+      setUpdateMessage(`${selectedPlanningActivity.label} is planned for ${formatServiceDate(planningForm.serviceDate)}. Choose another Sunday activity, or reopen a planned team to continue working on it.`);
+      if (typeof window !== 'undefined') {
+        window.requestAnimationFrame(() => {
+          activityPlannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
       await appendAuditEntry({
         churchId: selectedChurch.id,
         entityType: 'planning',
@@ -2422,6 +2800,7 @@ function App() {
     const canDeleteAssignment =
       adminProfile.roleKey === 'networkSuperAdmin'
       || adminProfile.roleKey === 'churchAdmin'
+      || adminProfile.roleKey === 'pastor'
       || (adminProfile.roleKey === 'teamLeader' && adminProfile.teamNames.includes(assignment.teamName));
     if (!canDeleteAssignment) {
       setUpdateMessage('You can only remove assignments inside the teams you manage.');
@@ -2559,7 +2938,7 @@ function App() {
 
   const handlePublishEvent = async () => {
     if (!canPublishEvents) {
-      setUpdateMessage('Only super admins and church admins can publish events.');
+      setUpdateMessage('Only super admins, church admins, and pastors can publish events.');
       return;
     }
     if (!selectedChurch || !eventForm.title.trim() || !eventForm.startAt || !eventForm.endAt) {
@@ -2567,7 +2946,11 @@ function App() {
       return;
     }
 
-    const scopeType = eventForm.scopeType;
+    const scopeType = effectiveEventScopeType;
+    if (scopeType === 'network' && !canPublishCommonEvents) {
+      setUpdateMessage('Only super admins can publish common events across all churches.');
+      return;
+    }
     const eventChurchId = scopeType === 'network' ? 'network' : selectedChurch.id;
     const scopeLabel = scopeType === 'network' ? 'All churches' : selectedChurch.displayCity;
     const location = eventForm.location || selectedChurch.address;
@@ -2635,8 +3018,17 @@ function App() {
   };
 
   const handleDeleteEvent = async (event: ChurchEventItem) => {
-    if (!canPublishEvents) {
-      setUpdateMessage('Only super admins, church admins, and pastors can delete events.');
+    if (!canCancelPublishedEvent(event)) {
+      setUpdateMessage(event.scopeType === 'network' || event.churchId === 'network'
+        ? 'Only super admins can cancel common events.'
+        : 'Only super admins, church admins, and pastors can cancel church-specific events.');
+      return;
+    }
+
+    const confirmCancel = typeof window === 'undefined'
+      ? true
+      : window.confirm(`Are you sure you want to cancel the event "${event.title}"?`);
+    if (!confirmCancel) {
       return;
     }
 
@@ -2646,23 +3038,23 @@ function App() {
       }
 
       setEvents((current) => current.filter((item) => item.id !== event.id));
-      setUpdateMessage(`Deleted the event "${event.title}".`);
+      setUpdateMessage(`Cancelled the event "${event.title}".`);
       await appendAuditEntry({
         churchId: event.churchId,
         entityType: 'church',
-        actionLabel: 'Deleted event',
+        actionLabel: 'Cancelled event',
         targetLabel: event.title,
-        summary: `${adminSession?.email ?? 'Church admin'} deleted ${event.scopeType === 'network' ? 'a common event' : 'a church-specific event'} for ${selectedChurch?.displayCity ?? 'the selected church'}.`,
+        summary: `${adminSession?.email ?? 'Church admin'} cancelled ${event.scopeType === 'network' ? 'a common event' : 'a church-specific event'} for ${selectedChurch?.displayCity ?? 'the selected church'}.`,
         actor: adminSession?.email ?? 'Church admin',
       });
     } catch (error) {
-      setUpdateMessage(error instanceof Error ? error.message : 'Unable to delete the event.');
+      setUpdateMessage(error instanceof Error ? error.message : 'Unable to cancel the event.');
     }
   };
 
   const handleCancelCommonMeeting = async (meeting: CommonMeetingOccurrence) => {
     if (!selectedChurch || !canManageCommonMeetings) {
-      setUpdateMessage('Only super admins and church admins can cancel common meetings.');
+      setUpdateMessage('Only super admins, church admins, and pastors can cancel common meetings.');
       return;
     }
 
@@ -2696,7 +3088,7 @@ function App() {
 
   const handleRestoreCommonMeeting = async (meeting: CommonMeetingOccurrence) => {
     if (!selectedChurch || !canManageCommonMeetings) {
-      setUpdateMessage('Only super admins and church admins can restore common meetings.');
+      setUpdateMessage('Only super admins, church admins, and pastors can restore common meetings.');
       return;
     }
 
@@ -2721,7 +3113,7 @@ function App() {
 
   const handleCancelChurchSpecificMeeting = async (meeting: ChurchSpecificMeetingOccurrence) => {
     if (!selectedChurch || !canManageCommonMeetings) {
-      setUpdateMessage('Only super admins and church admins can cancel church-specific meetings.');
+      setUpdateMessage('Only super admins, church admins, and pastors can cancel church-specific meetings.');
       return;
     }
 
@@ -2755,7 +3147,7 @@ function App() {
 
   const handleRestoreChurchSpecificMeeting = async (meeting: ChurchSpecificMeetingOccurrence) => {
     if (!selectedChurch || !canManageCommonMeetings) {
-      setUpdateMessage('Only super admins and church admins can restore church-specific meetings.');
+      setUpdateMessage('Only super admins, church admins, and pastors can restore church-specific meetings.');
       return;
     }
 
@@ -2823,7 +3215,7 @@ function App() {
 
   const handleSaveChurchEdit = async (church: Church) => {
     if (!canEditChurch) {
-      setUpdateMessage('Only super admins and church admins can edit church details.');
+      setUpdateMessage('Only super admins can edit church details.');
       return;
     }
 
@@ -2955,8 +3347,85 @@ function App() {
     );
   }
 
+  if (isResolvingAdminProfile) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <div className="auth-brand-block">
+            <OfficialSignature />
+            <p className="panel-kicker">Admin Dashboard</p>
+            <h1>Bethel Connect Admin</h1>
+            <p className="detail-copy">
+              Checking admin access for {adminSession.email}.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!adminProfile.hasDashboardPermission) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <div className="auth-brand-block">
+            <OfficialSignature />
+            <p className="panel-kicker">Admin Dashboard</p>
+            <h1>Bethel Connect Admin</h1>
+            <p className="detail-copy">
+              This account does not have admin access. Only super admins, church admins, pastors, and team leaders can sign in.
+            </p>
+          </div>
+          {authError ? <p className="auth-error">{authError}</p> : null}
+          <div className="auth-actions">
+            <button type="button" className="action-button reject" onClick={() => void handleSignOut()}>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-shell">
+      <div className="mobile-admin-dock">
+        <div className="mobile-admin-title-strip">
+          <div className="mobile-admin-title-block">
+            <OfficialSignature />
+            <div className="mobile-admin-title-copy">
+              <p className="brand-kicker">Admin Dashboard</p>
+              <h1>{mobileAdminTitle}</h1>
+            </div>
+          </div>
+          <div className="mobile-admin-title-actions">
+            <span className="topbar-chip">Role: {roleLabels[adminProfile.roleKey]}</span>
+            <button type="button" className="topbar-button topbar-signout mobile-admin-signout" onClick={() => void handleSignOut()}>Sign Out</button>
+          </div>
+        </div>
+        {adminProfile.roleKey === 'networkSuperAdmin' ? (
+          <div className="mobile-admin-scope-strip">
+            <label className="auth-label" htmlFor="mobile-scope-church">Church location</label>
+            <select
+              id="mobile-scope-church"
+              className="auth-input mobile-admin-scope-select"
+              value={selectedChurchId}
+              onChange={(event) => setSelectedChurchId(event.target.value)}
+            >
+              {scopeChurchChoices.map((church) => (
+                <option key={church.id} value={church.id}>{church.displayCity}</option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+        <nav className="mobile-admin-nav" aria-label="Admin sections">
+          {visibleNavigation.map((item) => (
+            <button key={item.key} type="button" className={`mobile-admin-nav-item ${item.key === activeView ? 'active' : ''}`} onClick={() => setActiveView(item.key)}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </div>
       <aside className="sidebar">
         <div className="brand-block">
           <OfficialSignature />
@@ -2966,7 +3435,7 @@ function App() {
         </div>
 
         <nav className="nav-list" aria-label="Admin sections">
-          {navigation.map((item) => (
+          {visibleNavigation.map((item) => (
             <button key={item.key} type="button" className={`nav-item ${item.key === activeView ? 'active' : ''}`} onClick={() => setActiveView(item.key)}>
               {item.label}
             </button>
@@ -2996,6 +3465,11 @@ function App() {
         ) : null}
         {!isFirebaseConfigured ? <div className="notice-banner">Firebase is not fully configured, so the admin app is currently running in local prototype mode with saved planning data in browser storage.</div> : null}
         {updateMessage ? <div className="notice-banner inline-banner">{updateMessage}</div> : null}
+        <div className="mobile-view-intro">
+          <p className="topbar-kicker">Church Network Dashboard</p>
+          <h2>{viewTitle[activeView]}</h2>
+          <p className="topbar-summary">{viewSummary[activeView]}</p>
+        </div>
 
         <header className="topbar">
           <div className="topbar-copy">
@@ -3010,51 +3484,25 @@ function App() {
               <span className="topbar-chip">Role: {roleLabels[adminProfile.roleKey]}</span>
               <button type="button" className="topbar-button topbar-signout" onClick={() => void handleSignOut()}>Sign Out</button>
             </div>
+            {adminProfile.roleKey === 'networkSuperAdmin' ? (
+              <div className="desktop-admin-scope-strip">
+                <label className="auth-label" htmlFor="desktop-scope-church">Church location</label>
+                <select
+                  id="desktop-scope-church"
+                  className="auth-input desktop-admin-scope-select"
+                  value={selectedChurchId}
+                  onChange={(event) => setSelectedChurchId(event.target.value)}
+                >
+                  {scopeChurchChoices.map((church) => (
+                    <option key={church.id} value={church.id}>{church.displayCity}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
         </header>
-        {activeView !== 'overview' ? (
-          <section className="scope-studio">
-            <article className="scope-card scope-card-primary">
-              <p className="panel-kicker">Scope studio</p>
-              <h3>Choose the church once, then work everywhere in that scope.</h3>
-              <p className="scope-card-copy">Approvals, members, planning, updates, and prayers follow this one selection.</p>
-              <div className="scope-card-controls">
-                <label className="auth-label" htmlFor="scope-church">Church location</label>
-                <select id="scope-church" className="auth-input" value={selectedChurchId} onChange={(event) => setSelectedChurchId(event.target.value)}>
-                  {scopeChurchChoices.map((church) => (
-                    <option key={church.id} value={church.id}>{church.displayCity}</option>
-                  ))}
-                </select>
-              </div>
-            </article>
-          </section>
-        ) : null}
-
         {activeView === 'overview' ? (
           <section className="dashboard-grid overview-grid">
-            <article className="scope-card scope-card-primary overview-scope-card">
-              <p className="panel-kicker">Scope studio</p>
-              <h3>Choose the church once.</h3>
-              <p className="scope-card-copy">Everything below updates to this location.</p>
-              <div className="scope-card-controls">
-                <label className="auth-label" htmlFor="overview-scope-church">Church location</label>
-                <select id="overview-scope-church" className="auth-input" value={selectedChurchId} onChange={(event) => setSelectedChurchId(event.target.value)}>
-                  {scopeChurchChoices.map((church) => (
-                    <option key={church.id} value={church.id}>{church.displayCity}</option>
-                  ))}
-                </select>
-              </div>
-            </article>
-            <article className="hero-card overview-hero-card">
-              <p className="panel-kicker">{selectedChurch?.displayCity ?? 'Church'} overview</p>
-              <h3>Keep onboarding, Sunday planning, and updates in one clear view.</h3>
-              <p>Track the key numbers, next-Sunday readiness, and church communication from one shared dashboard.</p>
-              <div className="hero-actions">
-                <span className="pill strong">Shared scope</span>
-                <span className="pill">Sunday planning</span>
-                <span className="pill">Church updates</span>
-              </div>
-            </article>
             <article className="metric-card">
               <p className="panel-kicker">Pending approvals</p>
               <strong>{scopedRequests.filter((request) => request.status === 'pending').length}</strong>
@@ -3228,7 +3676,7 @@ function App() {
                   <h3>Prayer requests for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
                 </div>
               </div>
-              {!canModeratePrayer ? <div className="notice-banner inline-banner">Only super admins and church admins can approve, hide, or remove prayer requests.</div> : null}
+              {!canModeratePrayer ? <div className="notice-banner inline-banner">Only super admins, church admins, and pastors can approve, hide, or remove prayer requests.</div> : null}
               <div className="prayer-moderation-grid">
                 {scopedPrayerRequests.map((request) => (
                   <article key={request.id} className="request-card selected">
@@ -3253,9 +3701,8 @@ function App() {
           </section>
         ) : null}
 
-        {activeView === 'members' ? (
+        {activeView === 'memberSetup' ? (
           <section className="dashboard-grid members-layout">
-            {canManageMembers ? (
             <article className="wide-card members-create-card">
               <p className="panel-kicker">Create a managed member profile</p>
               <h3>Add a church member directly</h3>
@@ -3271,7 +3718,7 @@ function App() {
                 <div className="multi-select-panel">
                   <strong>Role</strong>
                   <div className="chip-row selection-chip-grid">
-                    {(['member', 'volunteer', 'teamLeader', 'pastor', 'churchAdmin'] as RoleKey[]).map((roleKey) => (
+                    {memberRoleOptions.map((roleKey) => (
                       <button key={roleKey} type="button" className={`member-edit-button ${managedMemberForm.roleKey === roleKey ? 'member-save-button' : ''}`} onClick={() => setManagedMemberForm((current) => ({ ...current, roleKey }))}>
                         {roleLabels[roleKey]}
                       </button>
@@ -3299,11 +3746,84 @@ function App() {
                 <button type="button" className="action-button publish member-save-button" onClick={() => void handleCreateManagedMember()}>Add member</button>
               </div>
             </article>
-            ) : null}
+            <article className="wide-card planning-role-setup">
+              <div className="section-heading">
+                <div>
+                  <p className="panel-kicker">Team setup</p>
+                  <h3>Define teams and roles for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
+                </div>
+              </div>
+              <div className="planning-role-stack">
+                <section className="planning-role-section">
+                  <h4>Add team</h4>
+                  <p className="planning-role-copy">Create a ministry team for this church. It appears below in Team setup without changing the service order.</p>
+                  <div className="planning-team-form">
+                    <input className="auth-input" type="text" value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} placeholder="New ministry team" />
+                    <button type="button" className="action-button publish planning-inline-action" onClick={() => void handleAddTeam()}>Add team</button>
+                  </div>
+                </section>
+                <section className="planning-role-section">
+                  <h4>Add a role for any team</h4>
+                  <p className="planning-role-copy">Choose a team first, then add a role that should appear inside that team tile below.</p>
+                  <div className="planning-role-form">
+                    <select className="auth-input" value={newRoleForm.teamName} onChange={(event) => setNewRoleForm((current) => ({ ...current, teamName: event.target.value }))}>
+                      {orderedSelectedChurchTeams.map((teamName) => <option key={teamName} value={teamName}>{teamName}</option>)}
+                    </select>
+                    <input className="auth-input" type="text" value={newRoleForm.roleName} onChange={(event) => setNewRoleForm((current) => ({ ...current, roleName: event.target.value }))} placeholder="Role name" />
+                    <button type="button" className="action-button publish planning-inline-action" onClick={() => handleAddRole()}>Add role</button>
+                  </div>
+                </section>
+                <div className="planning-role-list">
+                  {orderedSelectedChurchTeams.map((teamName) => {
+                    const teamRoles = selectedChurchRoleConfigs.filter((role) => role.teamName === teamName);
+                    const expanded = expandedTeamName === teamName;
+                    return (
+                      <article key={teamName} className={`planning-role-team-card ${expanded ? 'expanded' : ''}`}>
+                        <button type="button" className="planning-role-team-toggle" onClick={() => setExpandedTeamName((current) => current === teamName ? '' : teamName)}>
+                          <div className="planning-role-team-header">
+                            <div className="planning-role-team-heading">
+                              <strong>{teamName}</strong>
+                              <div className="planning-role-team-summary">
+                                <span className="planning-role-team-icon-shell"><TeamIcon teamName={teamName} /></span>
+                                <span className="planning-role-team-count">{teamRoles.length} roles</span>
+                              </div>
+                            </div>
+                            <ChevronIcon className={`planning-activity-chevron ${expanded ? 'expanded' : ''}`} />
+                          </div>
+                        </button>
+                        {expanded ? (
+                          <>
+                            <div className="planning-team-card-actions">
+                              {teamIsDefault(teamName) ? <span className="planning-role-status">Default Team</span> : <button type="button" className="planning-role-delete" onClick={() => void handleDeleteTeam(teamName)}>Delete team</button>}
+                            </div>
+                            <div className="planning-role-list-inner">
+                              {teamRoles.map((role) => (
+                                <div key={role.id} className="planning-role-pill">
+                                  <div className="planning-role-pill-top">
+                                    <strong>{role.roleName}</strong>
+                                    <button type="button" className="planning-role-delete" onClick={() => handleDeleteRole(role.id)}>Delete role</button>
+                                  </div>
+                                  <span>{teamName}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {activeView === 'members' ? (
+          <section className="dashboard-grid members-layout">
             <article className="wide-card">
               <div className="section-heading">
                 <div>
-                  <p className="panel-kicker">Members</p>
+                  <p className="panel-kicker">Manage Members</p>
                   <h3>{selectedChurch?.displayCity ?? 'Selected church'} members</h3>
                 </div>
                 <div className="chip-row">
@@ -3352,7 +3872,7 @@ function App() {
               </div>
               <div className="member-grid">
                 {visibleMemberRecords.map((member) => {
-                  const memberDraft = memberEditDrafts[member.id] ?? { email: member.email, roleKey: member.roleKey, teamNames: member.teamNames };
+                  const memberDraft = memberEditDrafts[member.id] ?? { email: member.email, phoneNumber: member.phoneNumber ?? '', roleKey: member.roleKey, teamNames: member.teamNames };
                   const isEditing = memberEditId === member.id;
                   return (
                     <article key={member.id} className="member-tile">
@@ -3360,13 +3880,18 @@ function App() {
                         <div>
                           <h3>{member.fullName}</h3>
                           <p className="member-email">{member.email}</p>
-                          <div className="chip-row member-status-row">
-                            <span className="mini-chip">{getMemberStatusLabel(member)}</span>
-                          </div>
                         </div>
                         {canManageMembers ? (
                           <div className="member-card-actions">
-                            <button type="button" className="member-edit-button" onClick={() => handleStartMemberEdit(member)}>Edit</button>
+                            <button
+                              type="button"
+                              className="member-edit-button"
+                              onClick={() => handleStartMemberEdit(member)}
+                              disabled={!canEditMemberRecord(member)}
+                              title={!canEditMemberRecord(member) ? 'You do not have permission to edit this member.' : undefined}
+                            >
+                              Edit
+                            </button>
                             {canDeleteMembers ? (
                               <button
                                 type="button"
@@ -3377,7 +3902,7 @@ function App() {
                                   member.id === adminSession?.uid
                                     ? 'You cannot delete your own admin profile.'
                                     : !canDeleteMemberRecord(member)
-                                      ? 'Church admins cannot delete church admin or super admin profiles.'
+                                      ? 'Church admins and pastors cannot delete church admin or super admin profiles.'
                                       : undefined
                                 }
                               >
@@ -3392,10 +3917,10 @@ function App() {
                           <span className="member-meta-icon member-meta-role"><RoleIcon roleKey={isEditing ? memberDraft.roleKey : member.roleKey} /></span>
                           <div><strong>Role</strong><p>{roleLabels[isEditing ? memberDraft.roleKey : member.roleKey]}</p></div>
                         </div>
-                        <div className="member-meta-item">
-                          <span className="member-meta-icon member-meta-team"><TeamIcon teamName={(isEditing ? memberDraft.teamNames[0] : member.teamNames[0]) || 'Member'} /></span>
-                          <div><strong>Teams</strong><p>{(isEditing ? memberDraft.teamNames : member.teamNames).join(', ') || 'No team assigned'}</p></div>
-                        </div>
+                      <div className="member-meta-item">
+                        <span className="member-meta-icon member-meta-team"><TeamIcon teamName={(isEditing ? memberDraft.teamNames[0] : member.teamNames[0]) || 'Member'} /></span>
+                        <div><strong>Teams</strong><p>{(isEditing ? memberDraft.teamNames : member.teamNames).join(', ') || 'No team assigned'}</p></div>
+                      </div>
                       </div>
                       {isEditing ? (
                         <div className="member-edit-panel">
@@ -3416,9 +3941,25 @@ function App() {
                             />
                           </div>
                           <div className="member-edit-group">
+                            <strong>Mobile number</strong>
+                            <input
+                              className="auth-input"
+                              type="tel"
+                              value={memberDraft.phoneNumber}
+                              onChange={(event) => setMemberEditDrafts((current) => ({
+                                ...current,
+                                [member.id]: {
+                                  ...memberDraft,
+                                  phoneNumber: event.target.value,
+                                },
+                              }))}
+                              placeholder="Please enter the member mobile number"
+                            />
+                          </div>
+                          <div className="member-edit-group">
                             <strong>Role</strong>
                             <div className="chip-row selection-chip-grid">
-                              {(['member', 'volunteer', 'teamLeader', 'pastor', 'churchAdmin'] as RoleKey[]).map((roleKey) => (
+                              {memberRoleOptions.map((roleKey) => (
                                 <button key={roleKey} type="button" className={`member-edit-button ${memberDraft.roleKey === roleKey ? 'member-save-button' : ''}`} onClick={() => setMemberEditDrafts((current) => ({ ...current, [member.id]: { ...memberDraft, roleKey } }))}>
                                   {roleLabels[roleKey]}
                                 </button>
@@ -3459,98 +4000,38 @@ function App() {
         ) : null}
         {activeView === 'planning' ? (
           <section className="dashboard-grid planning-layout">
-            {canManagePlanningStructure ? (
-              <article className="wide-card planning-role-setup">
-                <div className="section-heading">
-                  <div>
-                    <p className="panel-kicker">Team setup</p>
-                    <h3>Define teams and roles for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
-                  </div>
-                </div>
-                <div className="planning-role-stack">
-                  <section className="planning-role-section">
-                    <h4>Add team</h4>
-                    <p className="planning-role-copy">Create a ministry team for this church. It appears below in Team setup without changing the service order.</p>
-                    <div className="planning-team-form">
-                      <input className="auth-input" type="text" value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} placeholder="New ministry team" />
-                      <button type="button" className="action-button publish planning-inline-action" onClick={() => void handleAddTeam()}>Add team</button>
-                    </div>
-                  </section>
-                  <section className="planning-role-section">
-                    <h4>Add a role for any team</h4>
-                    <p className="planning-role-copy">Choose a team first, then add a role that should appear inside that team tile below.</p>
-                    <div className="planning-role-form">
-                      <select className="auth-input" value={newRoleForm.teamName} onChange={(event) => setNewRoleForm((current) => ({ ...current, teamName: event.target.value }))}>
-                        {orderedSelectedChurchTeams.map((teamName) => <option key={teamName} value={teamName}>{teamName}</option>)}
-                      </select>
-                      <input className="auth-input" type="text" value={newRoleForm.roleName} onChange={(event) => setNewRoleForm((current) => ({ ...current, roleName: event.target.value }))} placeholder="Role name" />
-                      <button type="button" className="action-button publish planning-inline-action" onClick={() => handleAddRole()}>Add role</button>
-                    </div>
-                  </section>
-                  <div className="planning-role-list">
-                    {orderedSelectedChurchTeams.map((teamName) => {
-                      const teamRoles = selectedChurchRoleConfigs.filter((role) => role.teamName === teamName);
-                      const expanded = expandedTeamName === teamName;
-                      return (
-                        <article key={teamName} className={`planning-role-team-card ${expanded ? 'expanded' : ''}`}>
-                          <button type="button" className="planning-role-team-toggle" onClick={() => setExpandedTeamName((current) => current === teamName ? '' : teamName)}>
-                            <div className="planning-role-team-header">
-                              <div className="planning-role-team-heading">
-                                <strong>{teamName}</strong>
-                                <div className="planning-role-team-summary">
-                                  <span className="planning-role-team-icon-shell"><TeamIcon teamName={teamName} /></span>
-                                  <span className="planning-role-team-count">{teamRoles.length} roles</span>
-                                </div>
-                              </div>
-                              <ChevronIcon className={`planning-activity-chevron ${expanded ? 'expanded' : ''}`} />
-                            </div>
-                          </button>
-                          {expanded ? (
-                            <>
-                              <div className="planning-team-card-actions">
-                                {teamIsDefault(teamName) ? <span className="planning-role-status">Default Team</span> : <button type="button" className="planning-role-delete" onClick={() => void handleDeleteTeam(teamName)}>Delete team</button>}
-                              </div>
-                              <div className="planning-role-list-inner">
-                                {teamRoles.map((role) => (
-                                  <div key={role.id} className="planning-role-pill">
-                                    <div className="planning-role-pill-top">
-                                      <strong>{role.roleName}</strong>
-                                      <button type="button" className="planning-role-delete" onClick={() => handleDeleteRole(role.id)}>Delete role</button>
-                                    </div>
-                                    <span>{teamName}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </>
-                          ) : null}
-                        </article>
-                      );
-                    })}
-                  </div>
-                </div>
-              </article>
-            ) : null}
-
             <article className="wide-card">
               <div className="section-heading">
                 <div>
                   <p className="panel-kicker">Sunday service order</p>
                   <h3>Plan the next two Sundays</h3>
                 </div>
-                {canManagePlanningStructure ? <button type="button" className={`action-button publish planning-order-toggle ${isEditingServiceOrder ? 'active' : ''}`} onClick={() => setIsEditingServiceOrder((current) => !current)}><span>Change service<br />order</span></button> : null}
+              </div>
+              <div className="planning-sunday-toolbar">
+                {upcomingPlanningSundays.map((serviceDate, index) => (
+                  <button
+                    key={serviceDate}
+                    type="button"
+                    className={`member-edit-button planning-sunday-switch-button ${serviceDate === selectedPlanningSunday ? 'active' : ''}`}
+                    aria-pressed={serviceDate === selectedPlanningSunday}
+                    onClick={() => setSelectedPlanningSunday(serviceDate)}
+                  >
+                    {index === 0 ? 'Current Sunday' : 'Next Sunday'}
+                  </button>
+                ))}
+                {canEditServiceOrder ? <button type="button" className={`action-button publish planning-order-toggle ${isEditingServiceOrder ? 'active' : ''}`} onClick={() => void handleToggleServiceOrderEditing()}><span>{isEditingServiceOrder ? 'Done' : 'Change service order'}</span></button> : null}
               </div>
               <div className="planning-sunday-columns">
-                {upcomingPlanningSundays.map((serviceDate) => (
+                {(upcomingPlanningSundays.includes(selectedPlanningSunday) ? [selectedPlanningSunday] : [upcomingPlanningSundays[0]].filter(Boolean)).map((serviceDate) => (
                   <div key={serviceDate} className="planning-sunday-card">
                     <div className="planning-sunday-header">
                       <div>
                         <strong>{formatServiceDate(serviceDate)}</strong>
-                        <p>{serviceDate === selectedPlanningSunday ? 'Active Sunday' : 'Upcoming Sunday'}</p>
+                        <p>{serviceDate === upcomingPlanningSundays[0] ? 'Current Sunday' : 'Next Sunday'}</p>
                       </div>
-                      <button type="button" className="member-edit-button" onClick={() => setSelectedPlanningSunday(serviceDate)}>Select</button>
                     </div>
                     <div className="planning-activity-list">
-                      {selectedChurchServiceOrder.map((activity) => {
+                      {visibleServiceOrder.map((activity) => {
                         const activityKey = `${serviceDate}:${activity.id}`;
                         const expanded = expandedActivityKeys[activityKey] === true;
                         const requirements = buildRequirementsForActivities([activity], selectedChurchRoleConfigs);
@@ -3567,16 +4048,16 @@ function App() {
                               </div>
                               <ChevronIcon className={`planning-activity-chevron ${expanded ? 'expanded' : ''}`} />
                             </button>
+                            {isEditingServiceOrder && canEditServiceOrder ? (
+                              <div className="planning-activity-reorder-row">
+                                <button type="button" className="member-edit-button" onClick={() => handleMoveActivity(activity.id, 'up')}>Up</button>
+                                <button type="button" className="member-edit-button" onClick={() => handleMoveActivity(activity.id, 'down')}>Down</button>
+                              </div>
+                            ) : null}
                             {expanded ? (
                               <div className="planning-activity-body">
                                 <div className="planning-activity-controls">
                                   {canPlanActivity ? <button type="button" className="member-edit-button" onClick={() => openActivityPlanner(serviceDate, activity)}>Plan</button> : null}
-                                  {isEditingServiceOrder && canManagePlanningStructure ? (
-                                    <>
-                                      <button type="button" className="member-edit-button" onClick={() => handleMoveActivity(activity.id, 'up')}>Up</button>
-                                      <button type="button" className="member-edit-button" onClick={() => handleMoveActivity(activity.id, 'down')}>Down</button>
-                                    </>
-                                  ) : null}
                                 </div>
                                 {requirements.map((requirement) => {
                                   const plannedAssignments = getAssignmentsForRequirement(scopedAssignments, serviceDate, requirement);
@@ -3617,7 +4098,7 @@ function App() {
             <article className="composer-card">
               <p className="panel-kicker">Activity planner</p>
               <h3>Plan Sunday roles</h3>
-              <div className="planning-form-grid planning-activity-picker">
+              <div ref={activityPlannerRef} className="planning-form-grid planning-activity-picker">
                 <div className="planning-activity-field">
                   <label className="auth-label" htmlFor="planning-service-date">Sunday</label>
                   <select id="planning-service-date" className="auth-input" value={planningForm.serviceDate} onChange={(event) => setPlanningForm((current) => ({ ...current, serviceDate: event.target.value }))}>
@@ -3660,6 +4141,12 @@ function App() {
                     <div><h4>{selectedPlanningActivity.label}</h4><p>{formatServiceDate(planningForm.serviceDate)} | {selectedPlanningActivity.teamName}</p></div>
                     <button type="button" className={`member-edit-button planning-other-member-toggle ${planningForm.allowOtherMembers ? 'active' : ''}`} onClick={() => setPlanningForm((current) => ({ ...current, allowOtherMembers: !current.allowOtherMembers }))}>Other member</button>
                   </div>
+                  {isCompactAdminView ? (
+                    <div className="planning-mobile-helper">
+                      <strong>{selectedPlanningMember ? `Selected member: ${selectedPlanningMember.fullName}` : 'Mobile planning mode'}</strong>
+                      <p>{selectedPlanningMember ? 'Tap an empty role slot to assign the selected member, or tap the member again to clear the selection.' : 'Tap a member below, then use the role-slot button to assign them.'}</p>
+                    </div>
+                  ) : null}
                   {planningBaselineSignature ? (
                     <div className="notice-banner inline-banner">This planner locks onto the latest saved version for this Sunday. If another admin changes the same activity while you are working, you will be asked to reopen it before saving.</div>
                   ) : null}
@@ -3668,17 +4155,36 @@ function App() {
                       <h4>Eligible members</h4>
                       <div className="planning-member-list">
                         {visibleMembers.map((member) => (
-                          <div key={member.id} className="planning-member-card planning-member-card-draggable" draggable onDragStart={(event) => { event.dataTransfer.setData('text/plain', member.id); setDraggedPlanningMemberId(member.id); }}>
-                            <span className="member-meta-icon member-meta-role planning-member-card-icon"><RoleIcon roleKey={member.roleKey} /></span>
-                            <div className="planning-member-card-content">
-                              <strong>{member.fullName}</strong>
-                              <p>{member.teamNames.join(', ') || 'No team assigned'}</p>
-                              <div className="planning-member-card-tags">
-                                <span className="mini-chip">{roleLabels[member.roleKey]}</span>
-                                {member.teamNames[0] ? <span className="mini-chip">{member.teamNames[0]}</span> : null}
+                          isCompactAdminView ? (
+                            <button
+                              key={member.id}
+                              type="button"
+                              className={`planning-member-card planning-member-card-button ${selectedPlanningMemberId === member.id ? 'active' : ''}`}
+                              onClick={() => handleSelectPlanningMember(member.id)}
+                            >
+                              <span className="member-meta-icon member-meta-role planning-member-card-icon"><RoleIcon roleKey={member.roleKey} /></span>
+                              <div className="planning-member-card-content">
+                                <strong>{member.fullName}</strong>
+                                <p>{member.teamNames.join(', ') || 'No team assigned'}</p>
+                                <div className="planning-member-card-tags">
+                                  <span className="mini-chip">{roleLabels[member.roleKey]}</span>
+                                  {member.teamNames[0] ? <span className="mini-chip">{member.teamNames[0]}</span> : null}
+                                </div>
+                              </div>
+                            </button>
+                          ) : (
+                            <div key={member.id} className="planning-member-card planning-member-card-draggable" draggable onDragStart={(event) => { event.dataTransfer.setData('text/plain', member.id); setDraggedPlanningMemberId(member.id); }}>
+                              <span className="member-meta-icon member-meta-role planning-member-card-icon"><RoleIcon roleKey={member.roleKey} /></span>
+                              <div className="planning-member-card-content">
+                                <strong>{member.fullName}</strong>
+                                <p>{member.teamNames.join(', ') || 'No team assigned'}</p>
+                                <div className="planning-member-card-tags">
+                                  <span className="mini-chip">{roleLabels[member.roleKey]}</span>
+                                  {member.teamNames[0] ? <span className="mini-chip">{member.teamNames[0]}</span> : null}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          )
                         ))}
                       </div>
                     </div>
@@ -3705,7 +4211,42 @@ function App() {
                                   </div>
                                 ))}
                               </div>
-                            ) : <div className="planning-slot-empty">Drop a member tile here.</div>}
+                            ) : <div className="planning-slot-empty">{isCompactAdminView ? 'Select a member above, then assign them here.' : 'Drop a member tile here.'}</div>}
+                            {(suggestionMapByRequirement[requirement.id] ?? []).length > 0 ? (
+                              <div className="planning-suggestion-block">
+                                <strong>Suggested from previous plans</strong>
+                                <div className="planning-suggestion-list">
+                                  {(suggestionMapByRequirement[requirement.id] ?? []).map((member) => (
+                                    <button
+                                      key={`${requirement.id}-${member.id}`}
+                                      type="button"
+                                      className="member-edit-button planning-suggestion-button"
+                                      onClick={() => {
+                                        if (isCompactAdminView) {
+                                          handleSelectPlanningMember(member.id);
+                                          setUpdateMessage(`${member.fullName} is selected. Use the assign button for ${requirement.roleName}.`);
+                                          return;
+                                        }
+                                        handleDropPlanningMember(requirement, member.id);
+                                      }}
+                                      disabled={(planningDraftAssignments[requirement.id] ?? []).length > 0}
+                                    >
+                                      {member.fullName}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {isCompactAdminView ? (
+                              <button
+                                type="button"
+                                className={`member-edit-button planning-slot-assign-button ${selectedPlanningMember ? 'active' : ''}`}
+                                onClick={() => handleAssignSelectedPlanningMember(requirement)}
+                                disabled={!selectedPlanningMember || (planningDraftAssignments[requirement.id] ?? []).length > 0}
+                              >
+                                {selectedPlanningMember ? `Assign ${selectedPlanningMember.fullName}` : 'Select a member first'}
+                              </button>
+                            ) : null}
                             {requirement.teamName === 'Speakers Team' ? (
                               <div className="planning-guest-row">
                                 <input className="auth-input" type="text" value={planningGuestInputs[requirement.id] ?? ''} onChange={(event) => setPlanningGuestInputs((current) => ({ ...current, [requirement.id]: event.target.value }))} placeholder="Guest speaker name" />
@@ -3718,11 +4259,49 @@ function App() {
                     </div>
                   </div>
                   <div className="planning-workbench-actions">
-                    <button type="button" className="action-button approve" onClick={() => void handleConfirmActivityPlan()} disabled={isCreatingAssignment}>{isCreatingAssignment ? 'Saving...' : 'Confirm activity plan'}</button>
+                    <button
+                      type="button"
+                      className={`action-button approve ${!planningHasUnsavedChanges && planningHasAssignments ? 'planning-confirmed-button' : ''}`}
+                      onClick={() => void handleConfirmActivityPlan()}
+                      disabled={isCreatingAssignment || !planningHasAssignments || !planningHasUnsavedChanges}
+                    >
+                      {isCreatingAssignment ? 'Saving...' : !planningHasAssignments ? 'Add assignments first' : !planningHasUnsavedChanges ? 'Activity planned' : 'Confirm activity plan'}
+                    </button>
                   </div>
                 </div>
               ) : null}
             </article>
+
+            {adminProfile.roleKey === 'teamLeader' ? (
+              <article className="detail-card">
+                <p className="panel-kicker">My team members</p>
+                <h3>Members you can plan</h3>
+                <p className="detail-copy">This list shows members from the teams you lead, so you can plan roles without needing the full member-management section.</p>
+                <div className="chip-row">
+                  {adminProfile.teamNames.map((teamName) => (
+                    <span key={teamName} className="mini-chip">{teamName}</span>
+                  ))}
+                </div>
+                <div className="planning-member-list">
+                  {managedTeamMembers.map((member) => (
+                    <div key={member.id} className="planning-member-card">
+                      <span className="member-meta-icon member-meta-role planning-member-card-icon"><RoleIcon roleKey={member.roleKey} /></span>
+                      <div className="planning-member-card-content">
+                        <strong>{member.fullName}</strong>
+                        <p>{member.email}</p>
+                        <div className="planning-member-card-tags">
+                          <span className="mini-chip">{roleLabels[member.roleKey]}</span>
+                          {member.teamNames.map((teamName) => (
+                            <span key={`${member.id}-${teamName}`} className="mini-chip">{teamName}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {managedTeamMembers.length === 0 ? <div className="empty-card">No members are assigned to your managed teams yet.</div> : null}
+                </div>
+              </article>
+            ) : null}
 
             <article className="detail-card">
               <p className="panel-kicker">Assignments</p>
@@ -3782,18 +4361,11 @@ function App() {
                     {archivedPlans.map((plan) => <option key={plan.serviceDate} value={plan.serviceDate}>{formatServiceDate(plan.serviceDate)}</option>)}
                   </select>
                 </div>
-                <div className="filter-panel">
-                  <label className="auth-label" htmlFor="archive-compare-sunday">Compare with another Sunday</label>
-                  <select id="archive-compare-sunday" className="auth-input" value={compareArchiveSunday} onChange={(event) => setCompareArchiveSunday(event.target.value)} disabled={archivedPlans.length < 2}>
-                    <option value="">{archivedPlans.length < 2 ? 'Need at least two archived Sundays' : 'Choose comparison Sunday'}</option>
-                    {archivedPlans.filter((plan) => plan.serviceDate !== selectedArchiveSunday).map((plan) => <option key={plan.serviceDate} value={plan.serviceDate}>{formatServiceDate(plan.serviceDate)}</option>)}
-                  </select>
-                </div>
-                <div className="chip-row">
-                  <span className="mini-chip">Saved file entries: {archivedPlans.length}</span>
-                  <button type="button" className="action-button approve" onClick={() => handleLoadArchive()} disabled={!selectedArchiveSunday}>Load archive</button>
-                  {canExportArchive ? <button type="button" className="action-button publish" onClick={() => handleExportArchive()} disabled={archivedPlans.length === 0}>Export archive file</button> : null}
-                  {canExportArchive ? <button type="button" className="member-edit-button" onClick={() => loadedArchivePlan ? handleExportArchive([loadedArchivePlan]) : undefined} disabled={!loadedArchivePlan}>Export loaded Sunday</button> : null}
+                  <div className="chip-row">
+                    <span className="mini-chip">Saved file entries: {archivedPlans.length}</span>
+                    <button type="button" className="action-button approve" onClick={() => handleLoadArchive()} disabled={!selectedArchiveSunday}>Load archive</button>
+                    {canExportArchive ? <button type="button" className="action-button publish" onClick={() => handleExportArchive()} disabled={archivedPlans.length === 0}>Export archive file</button> : null}
+                    {canExportArchive ? <button type="button" className="member-edit-button" onClick={() => loadedArchivePlan ? handleExportArchive([loadedArchivePlan]) : undefined} disabled={!loadedArchivePlan}>Export loaded Sunday</button> : null}
                 </div>
               </div>
               {selectedArchiveSunday && (!loadedArchivePlan || loadedArchivePlan.serviceDate !== selectedArchiveSunday) ? (
@@ -3809,16 +4381,7 @@ function App() {
                     </div>
                     <span className="archive-loaded-badge">Loaded archive</span>
                   </div>
-                  {archiveComparisonPlan ? (
-                    <div className="detail-card archive-compare-card">
-                      <p className="panel-kicker">Service history comparison</p>
-                      <h3>{formatServiceDate(loadedArchivePlan.serviceDate)} compared with {formatServiceDate(archiveComparisonPlan.serviceDate)}</h3>
-                      <div className="detail-block"><strong>Loaded Sunday assignments</strong><span>{countArchivedAssignments(loadedArchivePlan)}</span></div>
-                      <div className="detail-block"><strong>Comparison Sunday assignments</strong><span>{countArchivedAssignments(archiveComparisonPlan)}</span></div>
-                      <div className="detail-block"><strong>Difference</strong><span>{countArchivedAssignments(loadedArchivePlan) - countArchivedAssignments(archiveComparisonPlan)} assignment delta across the saved plan.</span></div>
-                    </div>
-                  ) : null}
-                  <div className="planning-sunday-card">
+                    <div className="planning-sunday-card">
                     <div className="planning-sunday-header">
                       <div>
                         <strong>{formatServiceDate(loadedArchivePlan.serviceDate)}</strong>
@@ -3929,11 +4492,11 @@ function App() {
               <p className="panel-kicker">Events</p>
               <h3>Publish events for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
               <div className="form-grid">
-                <div className="form-row">
+                <div className="form-row event-scope-row">
                   <label className="toggle-row">
                     <input
                       type="radio"
-                      checked={eventForm.scopeType === 'church'}
+                      checked={effectiveEventScopeType === 'church'}
                       onChange={() => setEventForm((current) => ({
                         ...current,
                         scopeType: 'church',
@@ -3943,14 +4506,18 @@ function App() {
                     />
                     Church specific event
                   </label>
-                  <label className="toggle-row">
-                    <input
-                      type="radio"
-                      checked={eventForm.scopeType === 'network'}
-                      onChange={() => setEventForm((current) => ({ ...current, scopeType: 'network', isPublic: true }))}
-                    />
-                    Common event across all churches
-                  </label>
+                  {canPublishCommonEvents ? (
+                    <label className="toggle-row">
+                      <input
+                        type="radio"
+                        checked={effectiveEventScopeType === 'network'}
+                        onChange={() => setEventForm((current) => ({ ...current, scopeType: 'network', isPublic: true }))}
+                      />
+                      Common event across all churches
+                    </label>
+                  ) : (
+                    <p className="detail-copy event-scope-note">Church admins and pastors can publish church-specific events only.</p>
+                  )}
                 </div>
                 <input className="auth-input" type="text" value={eventForm.title} onChange={(event) => setEventForm((current) => ({ ...current, title: event.target.value }))} placeholder="Event title" />
                 <textarea className="auth-input content-area" value={eventForm.description} onChange={(event) => setEventForm((current) => ({ ...current, description: event.target.value }))} placeholder="Event description" />
@@ -3958,7 +4525,7 @@ function App() {
                   <input className="auth-input" type="datetime-local" value={eventForm.startAt} onChange={(event) => setEventForm((current) => ({ ...current, startAt: event.target.value }))} />
                   <input className="auth-input" type="datetime-local" value={eventForm.endAt} onChange={(event) => setEventForm((current) => ({ ...current, endAt: event.target.value }))} />
                 </div>
-                <input className="auth-input" type="text" value={eventForm.location} onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))} placeholder={eventForm.scopeType === 'network' ? 'Online / host location' : 'Church address'} />
+                <input className="auth-input" type="text" value={eventForm.location} onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))} placeholder={effectiveEventScopeType === 'network' ? 'Online / host location' : 'Church address'} />
                 <div className="form-row event-poster-row">
                   <label className="event-poster-upload">
                     <span>Upload poster</span>
@@ -3987,20 +4554,36 @@ function App() {
                 </div>
                 <div className="common-meeting-intro">
                   <strong>Bethel Church Common Meetings</strong>
-                  <p className="detail-copy">Shared recurring Bethel meetings across all churches, with per-instance delete and restore controls.</p>
+                  <p className="detail-copy">Shared recurring Bethel meetings across all churches, with per-instance cancel and restore controls.</p>
                 </div>
               </div>
             </article>
             <article className="composer-card updates-card event-management-card">
               <p className="panel-kicker">Church specific events</p>
               <h3>Published church-specific events for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
+              <div className="event-filter-row">
+                {([
+                  ['thisWeek', 'This week'],
+                  ['nextWeek', 'Next week'],
+                  ['all', 'All events'],
+                ] as const).map(([filterKey, label]) => (
+                  <button
+                    key={filterKey}
+                    type="button"
+                    className={`member-edit-button event-filter-button ${churchSpecificEventFilter === filterKey ? 'active' : ''}`}
+                    onClick={() => setChurchSpecificEventFilter(filterKey)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="update-list event-instance-list">
-                {upcomingChurchSpecificMeetings.map((meeting) => (
+                {filteredUpcomingChurchSpecificMeetings.map((meeting) => (
                   <div key={`${meeting.key}-${meeting.occurrenceDate}`} className={`update-card announcement-update-card ${meeting.isCancelled ? 'common-meeting-cancelled' : ''}`}>
                     <div className="announcement-update-card-top">
                       <strong>{meeting.title}</strong>
                       {!meeting.isCancelled ? (
-                        <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleCancelChurchSpecificMeeting(meeting)} disabled={!canManageCommonMeetings}>Delete</button>
+                        <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleCancelChurchSpecificMeeting(meeting)} disabled={!canManageCommonMeetings}>Cancel</button>
                       ) : (
                         <button type="button" className="action-button publish compact-action announcement-delete-button" onClick={() => void handleRestoreChurchSpecificMeeting(meeting)} disabled={!canManageCommonMeetings}>Restore instance</button>
                       )}
@@ -4011,12 +4594,12 @@ function App() {
                     <p className="muted-line">{meeting.location}</p>
                   </div>
                 ))}
-                {scopedChurchSpecificEvents.map((event) => (
+                {filteredScopedChurchSpecificEvents.map((event) => (
                   <div key={event.id} className="update-card announcement-update-card">
                     {event.posterUrl ? <img className="update-card-poster" src={event.posterUrl} alt={`${event.title} poster`} /> : null}
                     <div className="announcement-update-card-top">
                       <strong>{event.title}</strong>
-                      <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleDeleteEvent(event)} disabled={!canPublishEvents}>Delete</button>
+                      <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleDeleteEvent(event)} disabled={!canCancelPublishedEvent(event)}>Cancel</button>
                     </div>
                     <p className="muted-line"><span className="mini-chip">{event.scopeLabel ?? selectedChurch?.displayCity ?? 'Church'} event</span></p>
                     <p className="detail-copy">{event.description}</p>
@@ -4024,20 +4607,36 @@ function App() {
                     <p className="muted-line">{event.location}</p>
                   </div>
                 ))}
-                {upcomingChurchSpecificMeetings.length === 0 && scopedChurchSpecificEvents.length === 0 ? <div className="empty-card">No church-specific meeting instances or published events are available yet.</div> : null}
+                {filteredUpcomingChurchSpecificMeetings.length === 0 && filteredScopedChurchSpecificEvents.length === 0 ? <div className="empty-card">No church-specific meeting instances or published events match this filter.</div> : null}
               </div>
             </article>
 
             <article className="composer-card updates-card event-management-card">
               <p className="panel-kicker">Common events</p>
               <h3>Published common events across all churches</h3>
+              <div className="event-filter-row">
+                {([
+                  ['thisWeek', 'This week'],
+                  ['nextWeek', 'Next week'],
+                  ['all', 'All events'],
+                ] as const).map(([filterKey, label]) => (
+                  <button
+                    key={filterKey}
+                    type="button"
+                    className={`member-edit-button event-filter-button ${commonEventFilter === filterKey ? 'active' : ''}`}
+                    onClick={() => setCommonEventFilter(filterKey)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="update-list event-instance-list">
-                {upcomingCommonMeetings.map((meeting) => (
+                {filteredUpcomingCommonMeetings.map((meeting) => (
                   <div key={`${meeting.key}-${meeting.occurrenceDate}`} className={`update-card announcement-update-card ${meeting.isCancelled ? 'common-meeting-cancelled' : ''}`}>
                     <div className="announcement-update-card-top">
                       <strong>{meeting.title}</strong>
                       {!meeting.isCancelled ? (
-                        <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleCancelCommonMeeting(meeting)} disabled={!canManageCommonMeetings}>Delete</button>
+                        <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleCancelCommonMeeting(meeting)} disabled={!canManageCommonMeetings}>Cancel</button>
                       ) : (
                         <button type="button" className="action-button publish compact-action announcement-delete-button" onClick={() => void handleRestoreCommonMeeting(meeting)} disabled={!canManageCommonMeetings}>Restore instance</button>
                       )}
@@ -4048,12 +4647,12 @@ function App() {
                     <p className="muted-line">{meeting.location}</p>
                   </div>
                 ))}
-                {scopedCommonEvents.map((event) => (
+                {filteredScopedCommonEvents.map((event) => (
                   <div key={event.id} className="update-card announcement-update-card">
                     {event.posterUrl ? <img className="update-card-poster" src={event.posterUrl} alt={`${event.title} poster`} /> : null}
                     <div className="announcement-update-card-top">
                       <strong>{event.title}</strong>
-                      <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleDeleteEvent(event)} disabled={!canPublishEvents}>Delete</button>
+                      <button type="button" className="action-button reject compact-action announcement-delete-button" onClick={() => void handleDeleteEvent(event)} disabled={!canCancelPublishedEvent(event)}>Cancel Event</button>
                     </div>
                     <p className="muted-line"><span className="mini-chip">Common event</span></p>
                     <p className="detail-copy">{event.description}</p>
@@ -4061,7 +4660,7 @@ function App() {
                     <p className="muted-line">{event.location}</p>
                   </div>
                 ))}
-                {upcomingCommonMeetings.length === 0 && scopedCommonEvents.length === 0 ? <div className="empty-card">No common meetings or published common events are available yet.</div> : null}
+                {filteredUpcomingCommonMeetings.length === 0 && filteredScopedCommonEvents.length === 0 ? <div className="empty-card">No common meetings or published common events match this filter.</div> : null}
               </div>
             </article>
           </section>

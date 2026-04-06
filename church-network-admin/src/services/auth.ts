@@ -42,17 +42,6 @@ export async function ensureAdminUserProfile(session: AdminSession) {
   const existingProfile = await getDoc(userRef);
 
   if (existingProfile.exists()) {
-    await setDoc(
-      userRef,
-      {
-        uid: session.uid,
-        email: session.email.trim().toLowerCase(),
-        displayName: session.displayName || null,
-        photoUrl: session.photoUrl || null,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
     return;
   }
 

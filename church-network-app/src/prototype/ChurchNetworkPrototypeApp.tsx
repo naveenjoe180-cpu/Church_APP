@@ -58,6 +58,7 @@ import {
 } from '../services/memberProfile';
 import {
   subscribeToMemberAssignments,
+  subscribeToTeamPlanAssignments,
   updateMemberAssignmentResponse,
   type MemberAssignment,
 } from '../services/teamAssignments';
@@ -75,6 +76,7 @@ type RequestForm = {
   phoneNumber: string;
   requestedChurchId: string;
   note: string;
+  confirmedDetails: boolean;
 };
 
 type PrayerRequestForm = {
@@ -86,8 +88,9 @@ const initialForm: RequestForm = {
   displayName: '',
   email: '',
   phoneNumber: '',
-  requestedChurchId: 'cologne',
+  requestedChurchId: '',
   note: '',
+  confirmedDetails: false,
 };
 
 const initialPrayerRequestForm: PrayerRequestForm = {
@@ -244,7 +247,7 @@ const helpGuideSections = [
     title: '1. Start as a guest',
     points: [
       'Before signing in, you can already explore the public side of Bethel Connect and learn about the church network.',
-      'Use Public church links to open About Us, Church Locations, the church website, online meeting access, social channels, and Contact Us.',
+      'Use Explore to open About Us, Church Locations, Connect with us, Facebook, and Contact Us through clear public sub-tabs.',
       'Bethel Church Common Meetings are also visible in guest mode so visitors can see the regular online rhythm of the church.',
     ],
   },
@@ -252,15 +255,17 @@ const helpGuideSections = [
     title: '2. Sign in and request member access',
     points: [
       'Use Sign In and continue with Google to enter the secure member-access flow.',
-      'If you are new, complete your member request by confirming your details, choosing the church you belong to, and adding an optional note for the church admin.',
-      'Your request is sent to the selected church admin or a super admin for approval.',
+      'If you are new, complete your member request by entering your mobile number, choosing the church you belong to, and reviewing the entered details carefully before you confirm and submit.',
+      'Church selection has no default value, so you must intentionally choose the correct church location yourself.',
+      'Your request is sent to the selected church admin for approval, and the app clearly states that access is granted only to church members.',
     ],
   },
   {
     title: '3. Wait for approval',
     points: [
       'Until approval is granted, the app keeps you in an awaiting-approval state instead of opening the private member area.',
-      'If your request needs a correction, you can return, update the details, and resubmit without creating a second account.',
+      'While the request is pending, you cannot keep resubmitting it repeatedly. The app holds the request in the pending state until church leadership responds.',
+      'If the request is rejected, you can review the details and submit the request again without creating a second account.',
       'Once approved, signing in with Google takes you directly into your member view without choosing the church again.',
     ],
   },
@@ -268,7 +273,8 @@ const helpGuideSections = [
     title: '4. Use your approved member space',
     points: [
       'After approval, your church dashboard opens with member-only tools and church-specific content.',
-      'The approved member navigation includes Home, My Teams & Plans, Calendar, Prayer, and Announcements.',
+      'The approved member navigation includes Home, My Teams & Plans, Announcements, Calendar, and Prayer.',
+      'A fixed top strip keeps the church logo, church name, your member identity, your current mode, and Sign Out visible while you move through the app.',
       'The content you see is connected to your own church, while network-wide items still remain visible where relevant.',
     ],
   },
@@ -276,7 +282,7 @@ const helpGuideSections = [
     title: '5. Follow your Home dashboard',
     points: [
       'Home is your starting point after approval and highlights the most important member information in one place.',
-      'It helps you keep track of your next Sunday responsibility, church updates, prayer participation, and church-specific support paths.',
+      'It helps you keep track of the true next upcoming event, your next Sunday responsibility, church updates, prayer participation, and church-specific support paths.',
       'Use Home when you want a quick summary before moving into one of the dedicated sections.',
     ],
   },
@@ -284,9 +290,10 @@ const helpGuideSections = [
     title: '6. Use My Teams & Plans correctly',
     points: [
       'My Teams & Plans combines your team membership and your upcoming Sunday assignments in one place.',
+      'Open the collapsible My Team Plan tile to see who is planned for which role in each visible team.',
       'The My Sunday plan tile groups assignments by Sunday and activity so you can understand the whole ministry flow, not just a single task.',
       'If you receive an assignment, respond by accepting or declining it so leaders can finalise the service plan.',
-      'If an assignment is removed or reassigned by the church, it disappears from your active response list and no longer needs action from you.',
+      'Once a Sunday has passed, its active request is removed from your response view.',
     ],
   },
   {
@@ -295,7 +302,7 @@ const helpGuideSections = [
       'Calendar combines local church events, church-specific meetings, common Bethel meetings, and recurring Sunday Service entries.',
       'The calendar opens on the current month and highlights today so it is easy to orient yourself quickly.',
       'Each church automatically shows Sunday Service at the church’s current service time, and the calendar updates if the service time changes later.',
-      'Selecting a date lets you review what is happening that day and use available event actions such as Add To Calendar or Download Invite.',
+      'Selecting a date auto-scrolls to the Events on that date tile, which is especially useful on mobile.',
     ],
   },
   {
@@ -303,8 +310,9 @@ const helpGuideSections = [
     points: [
       'Bethel Church Common Meetings are shared across all churches and are visible to everyone, including guests.',
       'Church Specific Meetings are visible inside the approved member space for your own church only.',
+      'Sunday Service appears first in the church-specific meeting area for your church and is also included in the calendar.',
       'Common and church-specific published events can also appear as meeting tiles when church leaders publish them.',
-      'If a church admin or super admin cancels a meeting occurrence, it is removed from the calendar and related meeting sections.',
+      'If leadership cancels a meeting occurrence, it is removed from the calendar and related meeting sections.',
     ],
   },
   {
@@ -312,9 +320,9 @@ const helpGuideSections = [
     points: [
       'Prayer lets you send a prayer request to your church and choose whether to share it anonymously.',
       'Your request appears publicly only after approval by church leadership.',
-      'The Prayer page also includes Prayer Wall below your own prayer requests, so approved church prayer requests stay visible in the same place.',
+      'The Prayer page includes Prayer Wall below your own prayer requests, so approved church prayer requests stay visible in the same place.',
       'Use Pray on a prayer-wall tile to mark that you prayed; this changes to Prayed for you only and is not shown to other users.',
-      'You can also remove your own prayer requests, and church leadership can hide or remove moderated requests when needed.',
+      'You can remove your own prayer requests, and church leadership can hide or remove moderated requests when needed.',
     ],
   },
   {
@@ -330,6 +338,7 @@ const helpGuideSections = [
     title: '11. Know your teams and role',
     points: [
       'My Teams & Plans shows the ministry teams you currently belong to and your current role in the church.',
+      'The My Team Plan tile is informational only, so you can understand the current and next Sunday role assignments within your teams without changing anything there.',
       'This section helps you understand why certain Sunday assignments are reaching you and which leaders may coordinate with you.',
       'If you are approved but no team has been assigned yet, the app keeps the space visible and explains that assignment will appear once leadership adds you.',
     ],
@@ -337,23 +346,23 @@ const helpGuideSections = [
   {
     title: '12. Use contact and support wisely',
     points: [
-      'Contact Us in Public church links opens WhatsApp so you can reach the church quickly.',
+      'Contact Us combines church website access and direct contact paths in one public place.',
       'Support options inside the approved member space help when you have assignment questions, event questions, or access issues.',
-      'Use the church website, online meeting link, and church social links when you need more public-facing church information beyond the app.',
+      'Use the church website and church social links when you need more public-facing church information beyond the app.',
     ],
   },
   {
-    title: '13. Notifications and updates',
+    title: '13. Understand the mobile experience',
     points: [
-      'The app is designed to surface assignment changes, approvals, announcements, and other church updates inside your member experience.',
-      'If notifications are enabled on your mobile app device, they can help you notice changes without constantly opening the app.',
-      'Important changes such as reassigned Sunday duties are also reflected directly inside the relevant app section.',
+      'The app uses fixed title strips and tab rows on phones so navigation remains visible without scrolling back to the top.',
+      'Explore and Member tabs are designed to auto-scroll to the relevant tile instead of forcing long manual scrolling.',
+      'Important changes such as reassigned Sunday duties are reflected directly inside the relevant section of the app.',
     ],
   },
   {
     title: '14. Recommended workflows',
     points: [
-      'New visitor workflow: open Public church links, read About Us, review Church Locations, then sign in with Google when you are ready to request access.',
+      'New visitor workflow: open Explore, read About Us, review Church Locations, then sign in with Google when you are ready to request access.',
       'New member workflow: sign in, complete the church request, wait for approval, then return through Sign In for direct member access.',
       'Weekly member workflow: check Home, review Calendar, open My Teams & Plans, respond to assignments, and stay aware of announcements and events.',
       'Prayer workflow: submit a prayer request in Prayer, then continue in the same Prayer page to review your requests and stand with the church in prayer for approved needs.',
@@ -375,6 +384,7 @@ export function ChurchNetworkPrototypeApp() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [requestReference, setRequestReference] = useState<string | null>(null);
+  const [forcePendingRequestState, setForcePendingRequestState] = useState(false);
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [memberProfile, setMemberProfile] = useState<MemberProfile | null>(null);
   const [notificationStatusMessage, setNotificationStatusMessage] = useState('');
@@ -389,7 +399,9 @@ export function ChurchNetworkPrototypeApp() {
   const [memberPrayerRequests, setMemberPrayerRequests] = useState<ChurchPrayerRequest[]>([]);
   const [prayedPrayerRequestIds, setPrayedPrayerRequestIds] = useState<string[]>([]);
   const [memberAssignments, setMemberAssignments] = useState<MemberAssignment[]>([]);
+  const [teamPlanAssignments, setTeamPlanAssignments] = useState<MemberAssignment[]>([]);
   const [churchContentNotice, setChurchContentNotice] = useState('');
+  const [teamPlanNotice, setTeamPlanNotice] = useState('');
   const [prayerNotice, setPrayerNotice] = useState('');
   const [assignmentNotice, setAssignmentNotice] = useState('');
   const [respondingAssignmentId, setRespondingAssignmentId] = useState<string | null>(null);
@@ -444,8 +456,12 @@ export function ChurchNetworkPrototypeApp() {
       return 'Guest Mode';
     }
 
+    if (forcePendingRequestState && memberProfile?.approvalStatus !== 'approved') {
+      return 'Awaiting Member Approval';
+    }
+
     if (memberProfile?.approvalStatus !== 'approved') {
-      return memberProfile?.approvalStatus === 'rejected' ? 'Update Request' : 'Awaiting Member Approval';
+      return memberProfile?.approvalStatus === 'rejected' ? 'Request Rejected' : 'Awaiting Member Approval';
     }
 
     if (memberProfile?.roleKey === 'networkSuperAdmin') {
@@ -457,11 +473,21 @@ export function ChurchNetworkPrototypeApp() {
     if (memberProfile?.roleKey === 'pastor') {
       return 'Pastor';
     }
+    if (memberProfile?.roleKey === 'teamLeader') {
+      return 'Team Leader';
+    }
+    if (memberProfile?.roleKey === 'volunteer') {
+      return 'Volunteer';
+    }
+    if (memberProfile?.roleKey === 'member') {
+      return 'Member';
+    }
 
-    return 'Member Mode';
-  }, [authSession, memberProfile?.approvalStatus, memberProfile?.roleKey]);
+    return 'Member';
+  }, [authSession, forcePendingRequestState, memberProfile?.approvalStatus, memberProfile?.roleKey]);
   const appTabs = stage === 'approved' ? approvedAppTabs : guestAppTabs;
   const availablePublicTabs = useMemo(() => getAvailablePublicTabs(selectedChurch), [selectedChurch]);
+  const hasTopTitleStrip = true;
   const scrollViewportMarginTop = stage === 'approved'
     ? isCompactMemberHeader
       ? activeAppTab === 'explore' || activeAppTab === 'member'
@@ -471,8 +497,8 @@ export function ChurchNetworkPrototypeApp() {
         ? 238
         : 152
     : activeAppTab === 'explore'
-      ? isCompactPhoneLayout ? 146 : 178
-      : isCompactPhoneLayout ? 80 : 92;
+      ? isCompactPhoneLayout ? 206 : 244
+      : isCompactPhoneLayout ? 136 : 154;
 
   const getCurrentAccessAnchorKey = () => {
     if (stage === 'signin') return 'access:signin';
@@ -500,6 +526,15 @@ export function ChurchNetworkPrototypeApp() {
 
   const registerContentAnchor = (anchorKey: string) => (event: LayoutChangeEvent) => {
     contentAnchorRef.current[anchorKey] = event.nativeEvent.layout.y;
+    if (pendingScrollTargetRef.current === anchorKey) {
+      pendingScrollTargetRef.current = null;
+      scrollToAnchor(anchorKey);
+    }
+  };
+
+  const registerNestedContentAnchor = (anchorKey: string, parentAnchorKey: string) => (event: LayoutChangeEvent) => {
+    const parentAnchorY = contentAnchorRef.current[parentAnchorKey] ?? 0;
+    contentAnchorRef.current[anchorKey] = parentAnchorY + event.nativeEvent.layout.y;
     if (pendingScrollTargetRef.current === anchorKey) {
       pendingScrollTargetRef.current = null;
       scrollToAnchor(anchorKey);
@@ -567,6 +602,7 @@ export function ChurchNetworkPrototypeApp() {
         ...current,
         email: session.email,
         displayName: current.displayName || session.displayName || '',
+        confirmedDetails: false,
       }));
       setIsSyncingAccess(true);
     });
@@ -632,6 +668,16 @@ export function ChurchNetworkPrototypeApp() {
   }, [authSession, isSyncingAccess, memberProfile]);
 
   useEffect(() => {
+    if (!forcePendingRequestState) {
+      return;
+    }
+
+    if (memberProfile?.approvalStatus === 'pending' || memberProfile?.approvalStatus === 'approved') {
+      setForcePendingRequestState(false);
+    }
+  }, [forcePendingRequestState, memberProfile?.approvalStatus]);
+
+  useEffect(() => {
     setActiveAppTab((current) => {
       if (stage === 'approved') {
         return current === 'access' ? 'member' : current;
@@ -651,8 +697,10 @@ export function ChurchNetworkPrototypeApp() {
       setMemberPrayerRequests([]);
       setPrayedPrayerRequestIds([]);
       setMemberAssignments([]);
+      setTeamPlanAssignments([]);
       previousAssignmentIdsRef.current = [];
       setChurchContentNotice('');
+      setTeamPlanNotice('');
       setPrayerNotice('');
       setAssignmentNotice('');
       return undefined;
@@ -777,6 +825,42 @@ export function ChurchNetworkPrototypeApp() {
   }, [authSession?.uid, selectedChurch?.id, stage]);
 
   useEffect(() => {
+    if (stage !== 'approved' || !selectedChurch?.id || !memberProfile) {
+      setTeamPlanAssignments([]);
+      setTeamPlanNotice('');
+      return undefined;
+    }
+
+    const canViewAllChurchTeamPlans =
+      memberProfile.roleKey === 'networkSuperAdmin'
+      || memberProfile.roleKey === 'churchAdmin'
+      || memberProfile.roleKey === 'pastor';
+    const visibleTeamNames = normalizeVisibleTeamNames(canViewAllChurchTeamPlans ? selectedChurch.teams : memberProfile.teamNames);
+    const visibleSundayDates = getUpcomingSundayDateKeys(2);
+
+    if (!canViewAllChurchTeamPlans && visibleTeamNames.length === 0) {
+      setTeamPlanAssignments([]);
+      setTeamPlanNotice('');
+      return undefined;
+    }
+
+    setTeamPlanNotice('');
+
+    return subscribeToTeamPlanAssignments(
+      selectedChurch.id,
+      visibleTeamNames,
+      visibleSundayDates,
+      canViewAllChurchTeamPlans,
+      (nextAssignments) => {
+        setTeamPlanAssignments(nextAssignments);
+      },
+      (error) => {
+        setTeamPlanNotice((current) => current || error.message);
+      },
+    );
+  }, [memberProfile, selectedChurch?.id, selectedChurch?.teams, stage]);
+
+  useEffect(() => {
     if (!authSession?.uid || !isFirebaseConfigured) {
       notificationRegistrationRef.current = null;
       setNotificationStatusMessage('');
@@ -861,8 +945,28 @@ export function ChurchNetworkPrototypeApp() {
       return;
     }
 
+    if (!requestForm.phoneNumber.trim()) {
+      setValidationMessage('Please enter your mobile number before sending the access request.');
+      return;
+    }
+
+    if (!requestForm.requestedChurchId.trim()) {
+      setValidationMessage('Please select the Church Location before sending your request.');
+      return;
+    }
+
+    if (!requestForm.confirmedDetails) {
+      setValidationMessage('Please confirm that your church selection and details are correct before submitting.');
+      return;
+    }
+
     if (!authSession) {
       setValidationMessage('Please complete sign-in before sending the access request.');
+      return;
+    }
+
+    if (memberProfile?.approvalStatus === 'pending') {
+      setValidationMessage('Your request is already pending. You can submit again only after a church admin rejects the current request.');
       return;
     }
 
@@ -880,6 +984,19 @@ export function ChurchNetworkPrototypeApp() {
           signInMethod,
         });
         setRequestReference(reference);
+        setForcePendingRequestState(true);
+        setMemberProfile((current) => current
+          ? {
+              ...current,
+              email: requestForm.email.trim().toLowerCase(),
+              displayName: requestForm.displayName.trim(),
+              approvalStatus: 'pending',
+              primaryChurchId: requestForm.requestedChurchId,
+              pendingChurchId: requestForm.requestedChurchId,
+              phoneNumber: requestForm.phoneNumber.trim(),
+              phoneVerificationStatus: requestForm.phoneNumber.trim() ? 'pending' : current.phoneVerificationStatus,
+            }
+          : null);
       } else {
         setRequestReference(null);
       }
@@ -902,10 +1019,12 @@ export function ChurchNetworkPrototypeApp() {
     setIsSubmitting(false);
     setIsAuthenticating(false);
     setRequestReference(null);
+    setForcePendingRequestState(false);
     setAuthSession(null);
     setMemberProfile(null);
     setIsSyncingAccess(false);
     setMemberAssignments([]);
+    setTeamPlanAssignments([]);
     previousAssignmentIdsRef.current = [];
     setChurchAnnouncements([]);
     setChurchEvents([]);
@@ -915,6 +1034,7 @@ export function ChurchNetworkPrototypeApp() {
     setMemberPrayerRequests([]);
     setPrayedPrayerRequestIds([]);
     setChurchContentNotice('');
+    setTeamPlanNotice('');
     setPrayerNotice('');
     setAssignmentNotice('');
     setPrayerForm(initialPrayerRequestForm);
@@ -1042,16 +1162,45 @@ export function ChurchNetworkPrototypeApp() {
             </View>
             <View style={[styles.memberHeaderActions, isCompactMemberHeader && styles.memberHeaderActionsCompact]}>
               <View style={[styles.memberHeaderMemberTile, isCompactMemberHeader && styles.memberHeaderMemberTileCompact]}>
-                <Text style={[styles.memberHeaderMemberTileText, isCompactMemberHeader && styles.memberHeaderMemberTileTextCompact]} numberOfLines={1}>
+                <Text style={[styles.memberHeaderMemberTileText, isCompactMemberHeader && styles.memberHeaderMemberTileTextCompact]} numberOfLines={isCompactMemberHeader ? 2 : 1}>
                   {requestForm.displayName || 'Member'}
                 </Text>
               </View>
-              <View style={styles.memberHeaderModeBadge}>
-                <Text style={styles.memberHeaderModeBadgeText}>{roleModeLabel}</Text>
+              <View style={[styles.memberHeaderModeBadge, isCompactMemberHeader && styles.memberHeaderModeBadgeCompact]}>
+                <Text style={[styles.memberHeaderModeBadgeText, isCompactMemberHeader && styles.memberHeaderModeBadgeTextCompact]}>{roleModeLabel}</Text>
               </View>
-              <Pressable onPress={resetDemo} style={styles.memberHeaderSignOutButton}>
-                <Text style={styles.memberHeaderSignOutButtonText}>Sign Out</Text>
+              <Pressable onPress={resetDemo} style={[styles.memberHeaderSignOutButton, isCompactMemberHeader && styles.memberHeaderSignOutButtonCompact]}>
+                <Text style={[styles.memberHeaderSignOutButtonText, isCompactMemberHeader && styles.memberHeaderSignOutButtonTextCompact]}>Sign Out</Text>
               </Pressable>
+            </View>
+          </View>
+        ) : hasTopTitleStrip ? (
+          <View style={[styles.memberHeaderStrip, isCompactMemberHeader && styles.memberHeaderStripCompact]}>
+            <View style={[styles.memberHeaderIdentity, isCompactMemberHeader && styles.memberHeaderIdentityCompact]}>
+              <Image source={officialLogo} resizeMode="contain" style={styles.memberHeaderLogo} />
+              <Text style={[styles.memberHeaderTitle, isCompactMemberHeader && styles.memberHeaderTitleCompact]} numberOfLines={isCompactMemberHeader ? 2 : 1}>
+                Bethel Connect
+              </Text>
+            </View>
+            <View style={[styles.memberHeaderActions, isCompactMemberHeader && styles.memberHeaderActionsCompact]}>
+              <View style={[styles.memberHeaderModeBadge, isCompactMemberHeader && styles.memberHeaderModeBadgeCompact]}>
+                <Text style={[styles.memberHeaderModeBadgeText, isCompactMemberHeader && styles.memberHeaderModeBadgeTextCompact]}>{roleModeLabel}</Text>
+              </View>
+              {authSession ? (
+                <Pressable onPress={resetDemo} style={[styles.memberHeaderSignOutButton, isCompactMemberHeader && styles.memberHeaderSignOutButtonCompact]}>
+                  <Text style={[styles.memberHeaderSignOutButtonText, isCompactMemberHeader && styles.memberHeaderSignOutButtonTextCompact]}>Sign Out</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    setActiveAppTab('access');
+                    setStage('signin');
+                  }}
+                  style={[styles.memberHeaderSignOutButton, isCompactMemberHeader && styles.memberHeaderSignOutButtonCompact]}
+                >
+                  <Text style={[styles.memberHeaderSignOutButtonText, isCompactMemberHeader && styles.memberHeaderSignOutButtonTextCompact]}>Sign In</Text>
+                </Pressable>
+              )}
             </View>
           </View>
         ) : null}
@@ -1137,59 +1286,11 @@ export function ChurchNetworkPrototypeApp() {
           <View style={styles.heroBrandColumn}>
             <OfficialSignature />
           </View>
-          {stage !== 'approved' ? (
-            <View style={styles.heroModeRow}>
-              <View style={styles.heroModeBadge}>
-                <Text style={styles.heroModeBadgeText}>{roleModeLabel}</Text>
-              </View>
-              {authSession ? (
-                <Pressable onPress={resetDemo} style={styles.heroSignOutButton}>
-                  <Text style={styles.heroSignOutButtonText}>Sign Out</Text>
-                </Pressable>
-              ) : (
-                <Pressable
-                  onPress={() => {
-                    setActiveAppTab('access');
-                    setStage('signin');
-                  }}
-                  style={styles.heroSignOutButton}
-                >
-                  <Text style={styles.heroSignOutButtonText}>Sign In</Text>
-                </Pressable>
-              )}
-            </View>
-          ) : null}
           </View>
           <View style={styles.heroBadgeRow}>
             <Badge label="Germany Network" tone="gold" />
           </View>
           <Text style={styles.eyebrow}>Bethel Connect</Text>
-          {stage === 'approved' ? (
-            <View style={styles.heroApprovedPanel}>
-              <Text style={styles.heroApprovedLabel}>Welcome to {selectedChurch.name}</Text>
-              <Text style={styles.heroApprovedBody}>
-                {requestForm.displayName || 'Member'}, you are now inside the {selectedChurch.displayCity} church space. This is where you receive church announcements,
-                see your next Sunday role, and respond when leaders assign you to serve.
-              </Text>
-              <View style={styles.heroApprovedMetrics}>
-                <View style={styles.heroApprovedMetricCard}>
-                  <Text style={styles.heroApprovedMetricLabel}>Sunday Plan</Text>
-                  <Text style={styles.heroApprovedMetricValue}>{heroNextAssignment ? formatAssignmentDate(heroNextAssignment.serviceDate) : 'Open'}</Text>
-                  <Text style={styles.heroApprovedMetricHint}>{heroNextAssignment ? `${heroNextAssignment.roleName} | ${heroNextAssignment.teamName}` : 'Your next service role will appear here'}</Text>
-                </View>
-                <View style={styles.heroApprovedMetricCard}>
-                  <Text style={styles.heroApprovedMetricLabel}>Church Updates</Text>
-                  <Text style={styles.heroApprovedMetricValue}>{activeHeroAnnouncements.length + churchEvents.length}</Text>
-                  <Text style={styles.heroApprovedMetricHint}>{activeHeroAnnouncements.length} announcements and {churchEvents.length} upcoming events</Text>
-                </View>
-                <View style={styles.heroApprovedMetricCard}>
-                  <Text style={styles.heroApprovedMetricLabel}>My Responses</Text>
-                  <Text style={styles.heroApprovedMetricValue}>{heroPendingAssignments > 0 ? heroPendingAssignments.toString() : heroAcceptedAssignments.toString()}</Text>
-                  <Text style={styles.heroApprovedMetricHint}>{heroPendingAssignments > 0 ? 'Assignments waiting for your response' : `${heroAcceptedAssignments} accepted so far`}</Text>
-                </View>
-              </View>
-            </View>
-          ) : null}
           {authSession && stage === 'profile' ? (
             <View style={styles.actionRowWide}>
               <PrimaryButton label="Complete Profile" onPress={() => setStage('profile')} />
@@ -1198,14 +1299,17 @@ export function ChurchNetworkPrototypeApp() {
           {authSession && stage === 'pending' ? (
             <View style={styles.actionRowWide}>
               <PrimaryButton
-                label={memberProfile?.approvalStatus === 'rejected' ? 'Update Request' : 'View Request'}
+                label={memberProfile?.approvalStatus === 'rejected' ? 'Submit Request Again' : 'View Request'}
                 onPress={() => {
+                  setActiveAppTab('access');
                   if (memberProfile?.approvalStatus === 'rejected') {
                     setStage('profile');
+                    scrollToAnchor('access:profile');
                     return;
                   }
 
                   setStage('pending');
+                  scrollToAnchor('access:pending');
                 }}
               />
             </View>
@@ -1248,8 +1352,8 @@ export function ChurchNetworkPrototypeApp() {
             <SignInChoiceScreen validationMessage={validationMessage} isAuthenticating={isAuthenticating} onBack={() => setStage('guest')} onContinue={() => void authenticateMember()} />
           </View>
         ) : null}
-        {activeAppTab === 'access' && stage === 'profile' ? <View onLayout={registerContentAnchor('access:profile')}><ProfileScreen churches={churches} form={requestForm} selectedChurchName={selectedChurch.name} validationMessage={validationMessage} isSubmitting={isSubmitting} authSession={authSession} onBack={() => setStage('signin')} onChange={setRequestForm} onSubmit={() => void submitRequest()} /></View> : null}
-        {activeAppTab === 'access' && stage === 'pending' ? <View onLayout={registerContentAnchor('access:pending')}><PendingApprovalScreen approvalStatus={memberProfile?.approvalStatus ?? 'pending'} churchName={selectedChurch.name} email={requestForm.email} requestReference={requestReference} notificationStatusMessage={notificationStatusMessage} onBackToGuest={resetDemo} onReturnToProfile={() => setStage('profile')} /></View> : null}
+        {activeAppTab === 'access' && stage === 'profile' ? <View onLayout={registerContentAnchor('access:profile')}><ProfileScreen churches={churches} form={requestForm} selectedChurchName={churches.find((church) => church.id === requestForm.requestedChurchId)?.name ?? ''} validationMessage={validationMessage} isSubmitting={isSubmitting} authSession={authSession} onBack={() => setStage('signin')} onChange={setRequestForm} onSubmit={() => void submitRequest()} /></View> : null}
+        {activeAppTab === 'access' && stage === 'pending' ? <View onLayout={registerContentAnchor('access:pending')}><PendingApprovalScreen approvalStatus={(forcePendingRequestState && memberProfile?.approvalStatus !== 'approved') ? 'pending' : (memberProfile?.approvalStatus ?? 'pending')} churchName={selectedChurch.name} email={requestForm.email} requestReference={requestReference} notificationStatusMessage={notificationStatusMessage} onBackToGuest={resetDemo} onReturnToProfile={() => setStage('profile')} /></View> : null}
         {activeAppTab === 'member' && stage === 'approved' ? (
           <ApprovedPreviewScreen
             form={requestForm}
@@ -1266,7 +1370,9 @@ export function ChurchNetworkPrototypeApp() {
             }))}
             memberPrayerRequests={memberPrayerRequests}
             assignments={memberAssignments}
+            teamPlanAssignments={teamPlanAssignments}
             contentNotice={churchContentNotice}
+            teamPlanNotice={teamPlanNotice}
             prayerNotice={prayerNotice}
             assignmentNotice={assignmentNotice}
             notificationStatusMessage={notificationStatusMessage}
@@ -1287,6 +1393,7 @@ export function ChurchNetworkPrototypeApp() {
             onChangeView={setActiveMemberView}
             onReset={resetDemo}
             registerAnchor={registerContentAnchor}
+            registerNestedAnchor={registerNestedContentAnchor}
             scrollToAnchor={scrollToAnchor}
           />
         ) : null}
@@ -1382,12 +1489,19 @@ function ProfileScreen({
   onChange: (updater: RequestForm | ((current: RequestForm) => RequestForm)) => void;
   onSubmit: () => void;
 }) {
-  const setField = (key: keyof RequestForm, value: string) => {
+  const setField = (key: 'displayName' | 'email' | 'phoneNumber' | 'requestedChurchId' | 'note', value: string) => {
     onChange((current) => ({
       ...current,
       [key]: value,
+      confirmedDetails: false,
     }));
   };
+  const missingRequirements = [
+    !form.phoneNumber.trim() ? 'Enter your mobile number.' : null,
+    !form.requestedChurchId.trim() ? 'Select the Church Location you belong to.' : null,
+    !form.confirmedDetails ? 'Confirm that your details are correct before submitting.' : null,
+  ].filter(Boolean) as string[];
+  const canSubmitRequest = missingRequirements.length === 0 && !isSubmitting;
 
   return (
     <>
@@ -1395,8 +1509,9 @@ function ProfileScreen({
       <View style={styles.panel}>
         <FormField label="Full name" value={form.displayName} placeholder="Enter your full name" onChangeText={(value) => setField('displayName', value)} />
         <FormField label="Email" value={form.email} placeholder="Enter your email" keyboardType="email-address" editable={false} onChangeText={(value) => setField('email', value)} />
-        <FormField label="Phone number" value={form.phoneNumber} placeholder="+491725818673" keyboardType="phone-pad" onChangeText={(value) => setField('phoneNumber', value)} />
-        <Text style={styles.fieldLabel}>Church location</Text>
+        <FormField label="Phone number" value={form.phoneNumber} placeholder="Please enter your mobile number" keyboardType="phone-pad" onChangeText={(value) => setField('phoneNumber', value)} />
+        <Text style={styles.fieldInstructionTitle}>Please select the Church Location</Text>
+        <Text style={styles.fieldInstructionBody}>Choose the Bethel church you belong to so your request goes to the correct church admin.</Text>
         <View style={styles.optionWrap}>
           {churches.map((church) => (
             <Pressable key={church.id} onPress={() => setField('requestedChurchId', church.id)} style={[styles.selectorTile, church.id === form.requestedChurchId && styles.selectorTileActive]}>
@@ -1406,18 +1521,42 @@ function ProfileScreen({
           ))}
         </View>
         <FormField label="Note to admin" value={form.note} placeholder="Optional note about your church or service interests" multiline onChangeText={(value) => setField('note', value)} />
-        <Text style={styles.helperText}>Selected church: {selectedChurchName}</Text>
+        <View style={styles.reviewPanel}>
+          <Text style={styles.reviewPanelTitle}>Please review your request before submitting</Text>
+          <Text style={styles.helperText}>Selected church: {selectedChurchName || 'No church selected yet'}</Text>
+          <Text style={styles.helperText}>Full name: {form.displayName || 'Not provided yet'}</Text>
+          <Text style={styles.helperText}>Email: {form.email || 'Not provided yet'}</Text>
+          <Text style={styles.helperText}>Mobile number: {form.phoneNumber || 'Not provided yet'}</Text>
+          <Text style={styles.helperText}>Note: {form.note.trim() ? form.note : 'No note added'}</Text>
+          <Pressable
+            onPress={() => onChange((current) => ({ ...current, confirmedDetails: !current.confirmedDetails }))}
+            style={[styles.confirmRow, form.confirmedDetails && styles.confirmRowActive]}
+          >
+            <View style={[styles.confirmCheckbox, form.confirmedDetails && styles.confirmCheckboxActive]}>
+              {form.confirmedDetails ? <Text style={styles.confirmCheckboxMark}>✓</Text> : null}
+            </View>
+            <Text style={styles.confirmText}>I confirm that the church location and the details above are correct.</Text>
+          </Pressable>
+        </View>
         <Text style={styles.helperText}>Request is sent to the church admin for Approval.</Text>
         <Text style={styles.helperText}>After you send this request, your church admin will review it before full member access is opened.</Text>
         {authSession?.providerId ? <Text style={styles.helperText}>Authenticated with: Google</Text> : null}
         <View style={styles.noticeBox}>
           <Text style={styles.noticeText}>You are signed in. Send your member request now, then wait for approval to get full access to the church space. Teams are assigned later by church admins and team leaders.</Text>
         </View>
+        {!canSubmitRequest ? (
+          <View style={styles.formRequirementBox}>
+            <Text style={styles.formRequirementTitle}>Before you can send the request:</Text>
+            {missingRequirements.map((item) => (
+              <Text key={item} style={styles.formRequirementItem}>- {item}</Text>
+            ))}
+          </View>
+        ) : null}
         {validationMessage ? <Text style={styles.errorText}>{validationMessage}</Text> : null}
       </View>
       <View style={styles.actionRowWide}>
         <SecondaryButton label="Back" onPress={onBack} />
-        <PrimaryButton label={isSubmitting ? 'Sending...' : 'Send Request'} onPress={onSubmit} disabled={isSubmitting} />
+        <PrimaryButton label={isSubmitting ? 'Sending...' : 'Send Request'} onPress={onSubmit} disabled={!canSubmitRequest} />
       </View>
     </>
   );
@@ -1445,18 +1584,18 @@ function PendingApprovalScreen({
   return (
     <>
       <SectionHeader
-        title={isRejected ? 'Request needs attention' : 'Pending approval'}
+        title={isRejected ? 'Request rejected' : 'Pending approval'}
         body={
           isRejected
-            ? 'If an admin rejects the request, the member can update the details and send it again.'
+            ? 'If an admin rejects the request, the member needs to review the form and submit the request again.'
             : 'The waiting state should feel reassuring and transparent instead of silent.'
         }
       />
       <View style={styles.panel}>
-        <Text style={styles.panelTitle}>{isRejected ? 'Update your details and resubmit' : 'Request sent successfully'}</Text>
+        <Text style={styles.panelTitle}>{isRejected ? 'Please submit your request again' : 'Request sent successfully'}</Text>
         <Text style={styles.cardBody}>
           {isRejected
-            ? `Your request for ${churchName} needs an update before access can be granted.`
+            ? `Your request for ${churchName} was rejected. Please review your details carefully and submit the request again.`
             : `Your request for ${churchName} has been sent. Please wait for approval to get full member access.`}
         </Text>
         <Text style={styles.cardBody}>Signed in with: Google</Text>
@@ -1472,30 +1611,16 @@ function PendingApprovalScreen({
               : `Once approved, you will first be added to the ${churchName} church space. Team access is assigned later by admins.`}
           </Text>
         </View>
-        <View style={styles.noticeBox}>
-          <Text style={styles.noticeText}>
-            {isRejected
-              ? 'This screen updates automatically from Firebase after an admin review.'
-              : 'This screen updates automatically from Firebase after an admin approval.'}
-          </Text>
-        </View>
         {notificationStatusMessage ? (
           <View style={styles.noticeBox}>
             <Text style={styles.noticeText}>{notificationStatusMessage}</Text>
           </View>
         ) : null}
-        <View style={styles.noticeBox}>
-          <Text style={styles.noticeText}>
-            {isRejected
-              ? 'After approval, members return directly to the approved church space.'
-              : 'Prayer requests will show a confirmation immediately and appear publicly only after moderation.'}
-          </Text>
-        </View>
       </View>
       <View style={styles.actionRowWide}>
         <SecondaryButton label="Sign Out" onPress={onBackToGuest} />
         <PrimaryButton
-          label={isRejected ? 'Update Request' : 'Approval Pending'}
+          label={isRejected ? 'Submit Request Again' : 'Approval Pending'}
           onPress={isRejected ? onReturnToProfile : onBackToGuest}
           disabled={!isRejected}
         />
@@ -1516,7 +1641,9 @@ function ApprovedPreviewScreen({
   prayerRequests,
   memberPrayerRequests,
   assignments,
+  teamPlanAssignments,
   contentNotice,
+  teamPlanNotice,
   prayerNotice,
   assignmentNotice,
   notificationStatusMessage,
@@ -1537,6 +1664,7 @@ function ApprovedPreviewScreen({
   activeView,
   onChangeView,
   registerAnchor,
+  registerNestedAnchor,
   scrollToAnchor,
 }: {
   form: RequestForm;
@@ -1550,7 +1678,9 @@ function ApprovedPreviewScreen({
   prayerRequests: ChurchPrayerRequest[];
   memberPrayerRequests: ChurchPrayerRequest[];
   assignments: MemberAssignment[];
+  teamPlanAssignments: MemberAssignment[];
   contentNotice: string;
+  teamPlanNotice: string;
   prayerNotice: string;
   assignmentNotice: string;
   notificationStatusMessage: string;
@@ -1571,10 +1701,15 @@ function ApprovedPreviewScreen({
   activeView: MemberViewKey;
   onChangeView: (view: MemberViewKey) => void;
   registerAnchor: (anchorKey: string) => (event: LayoutChangeEvent) => void;
+  registerNestedAnchor: (anchorKey: string, parentAnchorKey: string) => (event: LayoutChangeEvent) => void;
   scrollToAnchor: (anchorKey: string) => void;
 }) {
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState('');
+  const [isTeamDirectoryExpanded, setIsTeamDirectoryExpanded] = useState(false);
+  const teamPlanSundayOptions = useMemo(() => getUpcomingSundayDateKeys(2), []);
+  const [selectedTeamPlanDate, setSelectedTeamPlanDate] = useState(teamPlanSundayOptions[0] ?? '');
+  const [selectedTeamPlanTeam, setSelectedTeamPlanTeam] = useState('');
   const sortedAssignments = useMemo(
     () =>
       [...assignments]
@@ -1617,6 +1752,28 @@ function ApprovedPreviewScreen({
   const groupedSundayPlan = useMemo(() => buildSundayPlanGroups(sortedAssignments), [sortedAssignments]);
   const memberTeams = useMemo(() => normalizeVisibleTeamNames(memberProfile?.teamNames ?? []), [memberProfile?.teamNames]);
   const memberRole = memberProfile?.roleKey ? memberRoleLabels[memberProfile.roleKey] : 'Member';
+  const canViewAllChurchTeams = memberProfile?.roleKey === 'churchAdmin' || memberProfile?.roleKey === 'pastor' || memberProfile?.roleKey === 'networkSuperAdmin';
+  const visibleTeamNames = useMemo(
+    () => normalizeVisibleTeamNames(canViewAllChurchTeams ? church.teams : memberTeams),
+    [canViewAllChurchTeams, church.teams, memberTeams],
+  );
+  const assignmentsByVisibleTeam = useMemo(
+    () =>
+      visibleTeamNames.reduce<Record<string, MemberAssignment[]>>((groups, teamName) => {
+        groups[teamName] = teamPlanAssignments
+          .filter((assignment) =>
+            assignment.serviceDate === selectedTeamPlanDate
+            && assignment.teamName.trim().toLowerCase() === teamName.trim().toLowerCase(),
+          )
+          .sort((left, right) => left.roleName.localeCompare(right.roleName) || left.assignedTo.localeCompare(right.assignedTo));
+        return groups;
+      }, {}),
+    [selectedTeamPlanDate, teamPlanAssignments, visibleTeamNames],
+  );
+  const activeTeamPlanName = selectedTeamPlanTeam && visibleTeamNames.includes(selectedTeamPlanTeam)
+    ? selectedTeamPlanTeam
+    : (visibleTeamNames[0] ?? '');
+  const activeTeamPlanAssignments = activeTeamPlanName ? (assignmentsByVisibleTeam[activeTeamPlanName] ?? []) : [];
   const calendarMonthDate = useMemo(() => getCalendarMonthDate(calendarMonthOffset), [calendarMonthOffset]);
   const nextEvent = useMemo(() => {
     const now = new Date(eventClock);
@@ -1691,6 +1848,22 @@ function ApprovedPreviewScreen({
     setSelectedCalendarDate((current) => (current && calendarDays.some((day) => day.dateKey === current)) ? current : firstUsefulDate);
   }, [calendarDays]);
 
+  useEffect(() => {
+    setSelectedTeamPlanDate((current) =>
+      current && teamPlanSundayOptions.includes(current)
+        ? current
+        : (teamPlanSundayOptions[0] ?? '')
+    );
+  }, [teamPlanSundayOptions]);
+
+  useEffect(() => {
+    setSelectedTeamPlanTeam((current) =>
+      current && visibleTeamNames.includes(current)
+        ? current
+        : (visibleTeamNames[0] ?? '')
+    );
+  }, [visibleTeamNames]);
+
   const renderAssignmentActions = (assignment: MemberAssignment) => (
     <View style={styles.assignmentActionRow}>
       {assignment.responseStatus !== 'declined' ? (
@@ -1747,19 +1920,6 @@ function ApprovedPreviewScreen({
       ) : null}
       {activeView === 'home' ? (
         <View style={styles.grid} onLayout={registerAnchor('member:home')}>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>This week at {church.displayCity}</Text>
-            <View style={styles.contentMetricRow}>
-              <MetricCard label="Next Sunday" value={nextAssignment ? formatAssignmentDate(nextAssignment.serviceDate) : 'Open'} hint={nextAssignment ? `${getActivityName(nextAssignment)} | ${nextAssignment.roleName}` : 'No Sunday role has been assigned yet'} />
-              <MetricCard label="Announcements" value={`${activeAnnouncements.length}`} hint={activeAnnouncements[0]?.title ?? 'No announcements published yet'} />
-              <MetricCard
-                label="Upcoming event"
-                value={nextEvent?.title ?? 'Soon'}
-                hint={nextEvent ? formatCompactDate(nextEvent.startAt) : 'No church event is scheduled yet'}
-              />
-              <MetricCard label="My teams" value={`${memberTeams.length || 0}`} hint={`${memberRole} | ${memberTeams[0] ?? 'Waiting for team assignment'}`} />
-            </View>
-          </View>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Support and contact</Text>
             {assignmentNotice ? (
@@ -1889,7 +2049,7 @@ function ApprovedPreviewScreen({
               })}
             </View>
           </View>
-          <View style={[styles.card, styles.calendarDetailCard]} onLayout={registerAnchor('member:calendar-detail')}>
+          <View style={[styles.card, styles.calendarDetailCard]} onLayout={registerNestedAnchor('member:calendar-detail', 'member:calendar')}>
             <Text style={styles.cardTitle}>{selectedCalendarEvents ? `Events on ${formatAssignmentDate(selectedCalendarEvents.dateKey)}` : 'Choose a day'}</Text>
             <View style={styles.contentList}>
               {selectedCalendarEvents && selectedCalendarEvents.events.length > 0 ? (
@@ -2049,7 +2209,11 @@ function ApprovedPreviewScreen({
             <Text style={styles.cardTitle}>My teams</Text>
             <View style={styles.contentMetricRow}>
               <MetricCard label="Current role" value={memberRole} hint="Your effective role across this church space" />
-              <MetricCard label="Assigned teams" value={`${memberTeams.length || 0}`} hint={memberTeams[0] ?? 'No team has been assigned yet'} />
+              <MetricCard
+                label="Assigned teams"
+                value={`${memberTeams.length || 0}`}
+                hint={memberTeams.length > 0 ? memberTeams.join(', ') : 'No team has been assigned yet'}
+              />
             </View>
             <View style={styles.contentList}>
               {memberTeams.length > 0 ? (
@@ -2063,6 +2227,105 @@ function ApprovedPreviewScreen({
                 <Text style={styles.emptyState}>You are approved in {church.displayCity}, but no ministry team has been assigned yet. Once a church admin or team leader adds you to a team, it will appear here.</Text>
               )}
             </View>
+          </View>
+          <View style={styles.card}>
+            <Pressable
+              onPress={() => setIsTeamDirectoryExpanded((current) => !current)}
+              style={styles.collapsibleHeader}
+            >
+              <View style={styles.collapsibleHeaderCopy}>
+                <Text style={styles.cardTitle}>My Team Plan</Text>
+                <Text style={styles.cardBody}>
+                  {canViewAllChurchTeams
+                    ? `View the current and next Sunday plans for every ${church.displayCity} team.`
+                    : `View the current and next Sunday plans for the teams you belong to, so you can see who is serving in which role.`}
+                </Text>
+              </View>
+              <View style={styles.collapsibleToggleBadge}>
+                <Text style={styles.collapsibleToggleText}>{isTeamDirectoryExpanded ? 'Hide' : 'Show'}</Text>
+              </View>
+            </Pressable>
+            {isTeamDirectoryExpanded ? (
+              <View style={styles.contentList}>
+                <View style={styles.teamPlanSwitchRow}>
+                  {teamPlanSundayOptions.map((serviceDate, index) => (
+                    <Pressable
+                      key={serviceDate}
+                      onPress={() => setSelectedTeamPlanDate(serviceDate)}
+                      style={[
+                        styles.teamPlanSwitchButton,
+                        selectedTeamPlanDate === serviceDate && styles.teamPlanSwitchButtonActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.teamPlanSwitchButtonText,
+                          selectedTeamPlanDate === serviceDate && styles.teamPlanSwitchButtonTextActive,
+                        ]}
+                      >
+                        {index === 0 ? 'Current Sunday' : 'Next Sunday'}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {visibleTeamNames.length > 0 ? (
+                  <View style={styles.teamPlanTeamSwitchWrap}>
+                    <Text style={styles.teamPlanTeamSwitchLabel}>Choose team</Text>
+                    <View style={styles.teamPlanTeamSwitchRow}>
+                      {visibleTeamNames.map((teamName) => (
+                        <Pressable
+                          key={teamName}
+                          onPress={() => setSelectedTeamPlanTeam(teamName)}
+                          style={[
+                            styles.teamPlanTeamSwitchButton,
+                            activeTeamPlanName === teamName && styles.teamPlanTeamSwitchButtonActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.teamPlanTeamSwitchButtonText,
+                              activeTeamPlanName === teamName && styles.teamPlanTeamSwitchButtonTextActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {teamName}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+                {teamPlanNotice ? (
+                  <View style={styles.noticeBox}>
+                    <Text style={styles.noticeText}>{teamPlanNotice}</Text>
+                  </View>
+                ) : null}
+                {activeTeamPlanName ? (
+                  <View style={[styles.contentItem, styles.contentItemFirst]}>
+                    <Text style={styles.contentHeading}>{activeTeamPlanName}</Text>
+                    <Text style={styles.contentMeta}>
+                      {formatAssignmentDate(selectedTeamPlanDate)} | {activeTeamPlanAssignments.length} role{activeTeamPlanAssignments.length === 1 ? '' : 's'} planned
+                    </Text>
+                    {activeTeamPlanAssignments.length > 0 ? (
+                      <View style={styles.teamRosterList}>
+                        {activeTeamPlanAssignments.map((assignment) => (
+                          <View key={`${activeTeamPlanName}-${assignment.id}`} style={styles.teamRosterMemberCard}>
+                            <Text style={styles.teamRosterMemberName}>{assignment.roleName}</Text>
+                            <Text style={styles.teamRosterMemberRole}>{assignment.assignedTo}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.emptyState}>No one has been planned for this team yet on the selected Sunday.</Text>
+                    )}
+                  </View>
+                ) : (
+                  <Text style={styles.emptyState}>
+                    No teams are currently available for this view in {church.displayCity}.
+                  </Text>
+                )}
+              </View>
+            ) : null}
           </View>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>My Sunday plan</Text>
@@ -2558,6 +2821,22 @@ function normalizeVisibleTeamNames(teamNames: string[]) {
     list.push(trimmedName);
     return list;
   }, []);
+}
+
+function getUpcomingSundayDateKeys(count: number) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcoming: string[] = [];
+  const cursor = new Date(today);
+
+  while (upcoming.length < count) {
+    if (cursor.getDay() === 0) {
+      upcoming.push(formatDateKey(cursor));
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return upcoming;
 }
 
 function formatCompactDate(value: string) {
@@ -3202,7 +3481,9 @@ const styles = StyleSheet.create({
   memberHeaderStripCompact: {
     alignItems: 'stretch',
     flexDirection: 'column',
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   memberHeaderIdentity: {
     flex: 1,
@@ -3237,8 +3518,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   memberHeaderActionsCompact: {
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     justifyContent: 'flex-start',
+    alignItems: 'stretch',
+    width: '100%',
+    gap: 6,
   },
   memberHeaderMemberTile: {
     backgroundColor: colors.teal,
@@ -3248,7 +3532,11 @@ const styles = StyleSheet.create({
     maxWidth: 148,
   },
   memberHeaderMemberTileCompact: {
-    maxWidth: 170,
+    flex: 1,
+    maxWidth: '100%',
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   memberHeaderMemberTileText: {
     color: colors.white,
@@ -3258,6 +3546,7 @@ const styles = StyleSheet.create({
   },
   memberHeaderMemberTileTextCompact: {
     fontSize: 11,
+    lineHeight: 14,
   },
   memberHeaderModeBadge: {
     backgroundColor: colors.gold,
@@ -3273,17 +3562,35 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 16,
   },
+  memberHeaderModeBadgeCompact: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    justifyContent: 'center',
+  },
+  memberHeaderModeBadgeTextCompact: {
+    fontSize: 11,
+    lineHeight: 14,
+  },
   memberHeaderSignOutButton: {
     backgroundColor: colors.midnight,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
+  memberHeaderSignOutButtonCompact: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    justifyContent: 'center',
+  },
   memberHeaderSignOutButtonText: {
     color: colors.white,
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 16,
+  },
+  memberHeaderSignOutButtonTextCompact: {
+    fontSize: 11,
+    lineHeight: 14,
   },
   appTabDock: {
     flexDirection: 'row',
@@ -3567,6 +3874,8 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.softLine, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, color: colors.ink, fontSize: 15 },
   textArea: { minHeight: 110, textAlignVertical: 'top' },
   optionWrap: { gap: 10, marginBottom: 16 },
+  fieldInstructionTitle: { color: colors.midnight, fontSize: 17, fontWeight: '900', lineHeight: 22, marginBottom: 6 },
+  fieldInstructionBody: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 12 },
   selectorTile: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.softLine, borderRadius: 16, padding: 14 },
   selectorTileActive: { borderColor: colors.teal, backgroundColor: '#F3FBFC' },
   selectorTitle: { color: colors.midnight, fontSize: 15, fontWeight: '800', marginBottom: 4 },
@@ -3574,6 +3883,17 @@ const styles = StyleSheet.create({
   selectorBody: { color: colors.muted, fontSize: 14 },
   selectorBodyActive: { color: colors.teal },
   helperText: { color: colors.teal, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  reviewPanel: { gap: 8, marginBottom: 10, backgroundColor: '#F8FAFD', borderWidth: 1, borderColor: colors.softLine, borderRadius: 16, padding: 14 },
+  reviewPanelTitle: { color: colors.midnight, fontSize: 15, fontWeight: '800', lineHeight: 20 },
+  confirmRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.softLine, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
+  confirmRowActive: { borderColor: colors.teal, backgroundColor: '#F0FBFB' },
+  confirmCheckbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.softLine, alignItems: 'center', justifyContent: 'center', marginTop: 1, backgroundColor: colors.white },
+  confirmCheckboxActive: { borderColor: colors.teal, backgroundColor: colors.teal },
+  confirmCheckboxMark: { color: colors.white, fontSize: 13, fontWeight: '900', lineHeight: 14 },
+  confirmText: { flex: 1, color: colors.midnight, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  formRequirementBox: { marginTop: 10, backgroundColor: '#FFF8EA', borderWidth: 1, borderColor: colors.gold, borderRadius: 16, padding: 14, gap: 6 },
+  formRequirementTitle: { color: colors.midnight, fontSize: 14, fontWeight: '800', lineHeight: 19 },
+  formRequirementItem: { color: colors.ink, fontSize: 13, lineHeight: 18 },
   errorText: { color: '#A83A2E', fontSize: 14, fontWeight: '700', marginTop: 10 },
   recaptchaContainer: { width: 1, height: 1, opacity: 0, overflow: 'hidden' },
   moduleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 },
@@ -3581,9 +3901,29 @@ const styles = StyleSheet.create({
   modulePillActive: { backgroundColor: colors.teal, borderColor: colors.teal },
   modulePillText: { color: colors.navy, fontSize: 15, fontWeight: '800', textAlign: 'center', lineHeight: 20 },
   modulePillTextActive: { color: colors.white },
+  collapsibleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  collapsibleHeaderCopy: { flex: 1 },
+  collapsibleToggleBadge: { alignSelf: 'flex-start', backgroundColor: colors.parchment, borderRadius: 999, borderWidth: 1, borderColor: colors.softLine, paddingHorizontal: 12, paddingVertical: 7 },
+  collapsibleToggleText: { color: colors.midnight, fontSize: 12, fontWeight: '800' },
+  teamPlanSwitchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  teamPlanSwitchButton: { backgroundColor: colors.paper, borderRadius: 14, borderWidth: 1, borderColor: colors.softLine, paddingHorizontal: 12, paddingVertical: 10 },
+  teamPlanSwitchButtonActive: { backgroundColor: colors.midnight, borderColor: colors.midnight },
+  teamPlanSwitchButtonText: { color: colors.midnight, fontSize: 13, fontWeight: '800' },
+  teamPlanSwitchButtonTextActive: { color: colors.white },
+  teamPlanTeamSwitchWrap: { backgroundColor: colors.parchment, borderRadius: 16, borderWidth: 1, borderColor: colors.softLine, padding: 12, gap: 10 },
+  teamPlanTeamSwitchLabel: { color: colors.midnight, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  teamPlanTeamSwitchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  teamPlanTeamSwitchButton: { backgroundColor: colors.parchment, borderRadius: 999, borderWidth: 1, borderColor: colors.softLine, paddingHorizontal: 10, paddingVertical: 7, maxWidth: '100%' },
+  teamPlanTeamSwitchButtonActive: { backgroundColor: colors.teal, borderColor: colors.teal },
+  teamPlanTeamSwitchButtonText: { color: colors.midnight, fontSize: 12, fontWeight: '800' },
+  teamPlanTeamSwitchButtonTextActive: { color: colors.white },
   contentList: { gap: 14 },
   contentItem: { paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.softLine },
   contentItemFirst: { paddingTop: 0, borderTopWidth: 0 },
+  teamRosterList: { gap: 10, marginTop: 10 },
+  teamRosterMemberCard: { borderRadius: 16, backgroundColor: colors.parchment, borderWidth: 1, borderColor: colors.softLine, paddingHorizontal: 14, paddingVertical: 12 },
+  teamRosterMemberName: { color: colors.midnight, fontSize: 15, fontWeight: '800' },
+  teamRosterMemberRole: { color: colors.teal, fontSize: 13, fontWeight: '700', marginTop: 4 },
   assignmentTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   assignmentCopy: { flex: 1 },
   assignmentActionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },

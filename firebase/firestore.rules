@@ -55,10 +55,19 @@ service cloud.firestore {
       return isNetworkSuperAdmin() || (hasRole("pastor") && belongsToChurch(churchId));
     }
 
+    function isChurchManager(churchId) {
+      return isNetworkSuperAdmin()
+        || ((hasRole("churchAdmin") || hasRole("pastor")) && belongsToChurch(churchId));
+    }
+
+    function isAnyChurchManager() {
+      return hasRole("churchAdmin") || hasRole("pastor");
+    }
+
     function isTeamLeader(churchId, teamId) {
       return isNetworkSuperAdmin()
         || isChurchAdmin(churchId)
-        || (hasRole("teamLeader") && belongsToChurch(churchId) && belongsToTeam(teamId));
+        || ((hasRole("teamLeader") || hasRole("pastor")) && belongsToChurch(churchId) && belongsToTeam(teamId));
     }
 
     function targetHasRole(userData, roleKey) {
@@ -73,11 +82,20 @@ service cloud.firestore {
           isNetworkSuperAdmin()
           || (
             userData.primaryChurchId is string
-            && isChurchAdmin(userData.primaryChurchId)
+            && isChurchManager(userData.primaryChurchId)
             && !targetHasRole(userData, "networkSuperAdmin")
             && !targetHasRole(userData, "churchAdmin")
           )
         );
+    }
+
+    function isPastorManagedUserWrite(userData) {
+      return userData.primaryChurchId is string
+        && isPastor(userData.primaryChurchId)
+        && userData.roleFlags is map
+        && !targetHasRole(userData, "networkSuperAdmin")
+        && !targetHasRole(userData, "churchAdmin")
+        && !targetHasRole(userData, "pastor");
     }
 
     function isSafeSelfUserCreate(uid) {
@@ -133,6 +151,7 @@ service cloud.firestore {
 
     function isSafeAccessRequestCreate() {
       return request.resource.data.uid == request.auth.uid
+        && (!hasUserDoc() || approvalStatus() == "rejected")
         && request.resource.data.email is string
         && request.resource.data.fullName is string
         && request.resource.data.requestedChurchId is string
@@ -146,13 +165,13 @@ service cloud.firestore {
 
     match /churches/{churchId} {
       allow read: if resource.data.isPublic == true || (isApproved() && belongsToChurch(churchId)) || isNetworkSuperAdmin();
-      allow write: if isChurchAdmin(churchId);
+      allow write: if isNetworkSuperAdmin();
     }
 
     match /teams/{teamId} {
       allow read: if isApproved();
       allow write: if isNetworkSuperAdmin()
-        || (request.resource.data.churchId is string && isChurchAdmin(request.resource.data.churchId));
+        || (request.resource.data.churchId is string && isChurchManager(request.resource.data.churchId));
     }
 
     match /users/{uid} {
@@ -161,18 +180,26 @@ service cloud.firestore {
         || isNetworkSuperAdmin()
         || (
           request.resource.data.primaryChurchId is string
-          && isChurchAdmin(request.resource.data.primaryChurchId)
+          && isChurchManager(request.resource.data.primaryChurchId)
         )
       );
       allow read: if isSignedIn() && (
         request.auth.uid == uid
         || isNetworkSuperAdmin()
         || (
+          isApproved()
+          && resource != null
+          && resource.data.primaryChurchId is string
+          && belongsToChurch(resource.data.primaryChurchId)
+          && resource.data.approvalStatus == "approved"
+        )
+        || (
           resource != null
           && resource.data.primaryChurchId is string
           && (
             isPastor(resource.data.primaryChurchId)
             || isChurchAdmin(resource.data.primaryChurchId)
+            || (hasRole("teamLeader") && belongsToChurch(resource.data.primaryChurchId))
           )
         )
       );
@@ -182,11 +209,11 @@ service cloud.firestore {
         || (
           resource != null
           && resource.data.primaryChurchId is string
-          && isChurchAdmin(resource.data.primaryChurchId)
+          && isChurchManager(resource.data.primaryChurchId)
         )
         || (
           request.resource.data.primaryChurchId is string
-          && isChurchAdmin(request.resource.data.primaryChurchId)
+          && isChurchManager(request.resource.data.primaryChurchId)
         )
       );
       allow delete: if isSignedIn()
@@ -211,7 +238,7 @@ service cloud.firestore {
         isNetworkSuperAdmin()
         || (
           request.resource.data.primaryChurchId is string
-          && isChurchAdmin(request.resource.data.primaryChurchId)
+          && isChurchManager(request.resource.data.primaryChurchId)
         )
       );
       allow delete: if isSignedIn()
@@ -224,11 +251,11 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         resource.data.uid == request.auth.uid
         || isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.requestedChurchId)
+        || isChurchManager(resource.data.requestedChurchId)
       );
       allow update: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.requestedChurchId)
+        || isChurchManager(resource.data.requestedChurchId)
       );
       allow delete: if isNetworkSuperAdmin();
     }
@@ -245,11 +272,11 @@ service cloud.firestore {
         );
       allow create, update: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(request.resource.data.scopeChurchId)
+        || isChurchManager(request.resource.data.scopeChurchId)
       );
       allow delete: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.scopeChurchId)
+        || isChurchManager(resource.data.scopeChurchId)
       );
     }
 
@@ -266,68 +293,74 @@ service cloud.firestore {
       allow create, update: if isSignedIn() && (
         isNetworkSuperAdmin()
         || (
-          request.resource.data.scopeType == "network"
-          && isAnyChurchAdmin()
+          request.resource.data.scopeType != "network"
+          && isChurchManager(request.resource.data.churchId)
         )
-        || isChurchAdmin(request.resource.data.churchId)
       );
       allow delete: if isSignedIn() && (
         isNetworkSuperAdmin()
         || (
-          resource.data.scopeType == "network"
-          && isAnyChurchAdmin()
+          resource.data.scopeType != "network"
+          && isChurchManager(resource.data.churchId)
         )
-        || isChurchAdmin(resource.data.churchId)
       );
     }
 
     match /commonMeetingCancellations/{cancellationId} {
       allow read: if isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
         || (isApproved() && belongsToChurch(resource.data.churchId));
       allow create: if isSignedIn()
         && request.resource.data.churchId is string
         && (
           isNetworkSuperAdmin()
-          || isChurchAdmin(request.resource.data.churchId)
+          || isChurchManager(request.resource.data.churchId)
         );
       allow delete: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
       );
     }
 
     match /churchSpecificMeetingCancellations/{cancellationId} {
       allow read: if isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
         || (isApproved() && belongsToChurch(resource.data.churchId));
       allow create: if isSignedIn()
         && request.resource.data.churchId is string
         && (
           isNetworkSuperAdmin()
-          || isChurchAdmin(request.resource.data.churchId)
+          || isChurchManager(request.resource.data.churchId)
         );
       allow delete: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
       );
     }
 
     match /scheduleAssignments/{assignmentId} {
       allow read: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
         || isTeamLeader(resource.data.churchId, resource.data.teamId)
+        || (
+          isApproved()
+          && belongsToChurch(resource.data.churchId)
+          && (
+            (resource.data.teamId is string && belongsToTeam(resource.data.teamId))
+            || (resource.data.teamName is string && belongsToTeam(resource.data.teamName))
+          )
+        )
         || resource.data.assignedUserId == request.auth.uid
       );
       allow create: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(request.resource.data.churchId)
+        || isChurchManager(request.resource.data.churchId)
         || isTeamLeader(request.resource.data.churchId, request.resource.data.teamId)
       );
       allow update: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(request.resource.data.churchId)
+        || isChurchManager(request.resource.data.churchId)
         || isTeamLeader(request.resource.data.churchId, request.resource.data.teamId)
         || (
           resource.data.assignedUserId == request.auth.uid
@@ -340,7 +373,7 @@ service cloud.firestore {
       );
       allow delete: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
         || isTeamLeader(resource.data.churchId, resource.data.teamId)
       );
     }
@@ -365,12 +398,12 @@ service cloud.firestore {
         || isPastor(resource.data.churchId);
       allow update: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
       );
       allow delete: if isSignedIn() && (
         resource.data.submittedByUid == request.auth.uid
         || isNetworkSuperAdmin()
-        || isChurchAdmin(resource.data.churchId)
+        || isChurchManager(resource.data.churchId)
       );
     }
 
@@ -404,7 +437,7 @@ service cloud.firestore {
         );
       allow write: if isSignedIn() && (
         isNetworkSuperAdmin()
-        || isChurchAdmin(request.resource.data.churchId)
+        || isChurchManager(request.resource.data.churchId)
         || (
           request.resource.data.teamId is string
           && isTeamLeader(request.resource.data.churchId, request.resource.data.teamId)
@@ -436,7 +469,7 @@ service cloud.firestore {
         || (
           resource.data.audienceChurchId is string
           && (
-            isChurchAdmin(resource.data.audienceChurchId)
+            isChurchManager(resource.data.audienceChurchId)
             || isPastor(resource.data.audienceChurchId)
           )
         )

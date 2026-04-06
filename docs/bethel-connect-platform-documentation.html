@@ -174,7 +174,7 @@
         </div>
         <div class="meta-card">
           <strong>Generated</strong>
-          <span>4 April 2026</span>
+          <span>6 April 2026</span>
         </div>
         <div class="meta-card">
           <strong>Scope</strong>
@@ -250,8 +250,9 @@
       <p>
         The platform currently uses Google sign-in as the primary authentication method. Signing in does
         not automatically grant member access. A user must first request access by selecting the church
-        they belong to. That request is then reviewed by the relevant church administrator. Once approved,
-        the same Google account can sign in and move directly into the member experience.
+        they belong to, entering their mobile number, reviewing their details, and confirming the request.
+        That request is then reviewed by the relevant church administrator. Once approved, the same
+        Google account can sign in and move directly into the member experience.
       </p>
       <h3>Content distribution model</h3>
       <ul>
@@ -319,15 +320,21 @@
       <p>
         Access is the guest entry point into the secure member flow. It contains the sign-in action and
         clearly explains that access is granted only to church members after approval by the church admin.
+        In guest mode, the fixed top strip uses the Bethel Connect identity rather than a church-location
+        name, because the person has not yet selected a church.
       </p>
 
       <h3>3.3 Sign-in and member approval workflow</h3>
       <ol>
         <li>The user taps Continue With Google.</li>
         <li>If the user does not already have approved access, the app opens the request-access flow.</li>
-        <li>The user selects the church they belong to and can add an optional message.</li>
+        <li>The user must select the church location intentionally. There is no default church selection, which reduces the chance of routing the request to the wrong church.</li>
+        <li>The user enters the required mobile number and can add an optional message.</li>
+        <li>The form shows visible missing-detail guidance when submission is blocked, so the user can see exactly what still needs to be completed.</li>
+        <li>The app shows a review panel with the selected church and submitted details, and the user confirms the information before sending the request.</li>
         <li>The request is routed to the corresponding church admin for approval.</li>
-        <li>Until approval is granted, the user stays in an awaiting-approval state.</li>
+        <li>Until approval is granted, the user stays in an awaiting-approval state and cannot keep resubmitting the same pending request.</li>
+        <li>If the request is rejected, the user must review the form and submit the request again. Once resubmitted, the app returns the user to the pending-approval state.</li>
         <li>Once approved, the same Google sign-in takes the user directly into the member area.</li>
       </ol>
       <div class="note">
@@ -352,8 +359,9 @@
       <h3>3.5 Member header strip and navigation model</h3>
       <p>
         The fixed header strip in member mode keeps core identity information always visible. It shows the
-        church logo, church name, member name, current role or mode, and the sign-out action. Under that,
-        the main member tabs stay visible so the user can move between sections quickly.
+        church logo, church name, member name, current role or mode, and the sign-out action. The role
+        badge reflects the actual approved role, such as Pastor or Team Leader. Under that, the main
+        member tabs stay visible so the user can move between sections quickly.
       </p>
       <p>
         This design reduces confusion on mobile devices because the user no longer needs to scroll back to
@@ -366,9 +374,10 @@
         attention to right now?” rather than duplicating every detail already available in deeper sections.
       </p>
       <ul>
-        <li>Highlights the next upcoming event.</li>
+        <li>Highlights the true next upcoming event across Sunday Service, default meetings, published common events, and church-specific events.</li>
         <li>Surfaces the next Sunday responsibility when one exists.</li>
         <li>Shows church-specific context for the member’s current church.</li>
+        <li>Uses a lighter landing experience by removing the older generic welcome card and its common subtiles.</li>
         <li>Provides a fast summary before the user moves into planning, calendar, prayer, or announcements.</li>
       </ul>
 
@@ -381,7 +390,16 @@
       <ul>
         <li>Shows the current church role assigned to the member.</li>
         <li>Lists the teams the member belongs to, such as Worship Team, Speakers Team, Tech Team, Sunday School Team, or Food Team.</li>
+        <li>Shows the assigned-team count together with the actual team names so the summary remains clear.</li>
         <li>Helps members understand why they are being assigned certain Sunday responsibilities.</li>
+      </ul>
+      <h4>My Team Plan</h4>
+      <ul>
+        <li>Provides a read-only plan view so members can see who is serving in which role inside their teams.</li>
+        <li>Includes Current Sunday and Next Sunday buttons to switch between planning windows quickly.</li>
+        <li>Uses smaller team-selection buttons below the Sunday selector so members with multiple teams can switch between teams without scrolling through long stacked lists.</li>
+        <li>Shows a clear empty state when a visible team has not yet been planned for the selected Sunday.</li>
+        <li>Pastors, church admins, and super admins can view all teams in the selected church from this tile.</li>
       </ul>
       <h4>My Sunday plan</h4>
       <ul>
@@ -488,8 +506,8 @@
       <h4>Church Specific Meetings</h4>
       <p>
         Each church can have its own meeting rhythm in addition to Sunday Service. For example, Bethel
-        Nuremberg includes Bible Reading and Church Intercessory Prayer. These appear as church-specific
-        meeting tiles and also feed the calendar.
+        Nuremberg includes Sunday Service, Bible Reading, and Church Intercessory Prayer. These appear as
+        church-specific meeting tiles and also feed the calendar.
       </p>
 
       <h3>3.12 Help</h3>
@@ -524,7 +542,8 @@
       <div class="chip-row">
         <span class="chip">Overview</span>
         <span class="chip">Approval Queue</span>
-        <span class="chip">Members</span>
+        <span class="chip">Add Members and Teams</span>
+        <span class="chip">Manage Members</span>
         <span class="chip">Team Planning</span>
         <span class="chip">Announcements and Events</span>
         <span class="chip">Churches And Teams</span>
@@ -535,6 +554,12 @@
         The selected church context shapes much of the dashboard behavior. Most actions apply to the
         chosen church unless an admin is intentionally creating a network-wide event or acting as a super
         admin across churches.
+      </p>
+      <p>
+        On mobile, the admin app follows the same general navigation idea as the user app: a fixed title
+        strip at the top, a compact tab row below it, and a dedicated church selector strip for super
+        admins. Church admins see their actual church name in the strip, while super admins keep the
+        broader Bethel Connect Admin identity together with the church selector.
       </p>
 
       <h3>4.2 Overview</h3>
@@ -559,33 +584,45 @@
       <ul>
         <li>Requests are routed by the church selected in the User App.</li>
         <li>Queue supports search, filtering, visibility counts, and bulk operations.</li>
+        <li>If a member resubmits multiple requests, the queue intentionally shows only the latest request for that person.</li>
         <li>Approving a request grants baseline member access, not elevated permissions.</li>
       </ul>
       <h4>Prayer moderation</h4>
       <ul>
         <li>Prayer requests appear below access approvals in their own moderation tile.</li>
-        <li>Super admins and church admins can approve, hide, or remove prayer requests.</li>
+        <li>Super admins, church admins, and pastors can approve, hide, or remove prayer requests.</li>
         <li>Approved requests appear on the Prayer Wall for members in that church.</li>
       </ul>
 
-      <h3>4.4 Members</h3>
+      <h3>4.4 Add Members and Teams</h3>
       <p>
-        Members is the control area for approved people after onboarding. It is where church leadership
-        can maintain role, team membership, and data quality.
+        Add Members and Teams separates structural setup from day-to-day member administration. It keeps
+        setup work out of the planning view and is available only to roles that shape church structure.
+      </p>
+      <ul>
+        <li>Create a managed member profile for a person who should be entered directly by leadership.</li>
+        <li>Define teams and roles used later in Sunday planning.</li>
+        <li>Visible to church admins and pastors so team leaders are not burdened with setup-only controls.</li>
+      </ul>
+
+      <h3>4.5 Manage Members</h3>
+      <p>
+        Manage Members is the control area for approved people after onboarding. It is where church
+        leadership can maintain role, team membership, and contact data quality.
       </p>
       <ul>
         <li>Supports search and sorting for easier member discovery.</li>
-        <li>Filters by church, role, team, and status.</li>
-        <li>Allows editing of member email, role, and team membership.</li>
-        <li>Supports deletion of members by church admins and super admins, within the allowed permission model.</li>
+        <li>Filters by church, role, and team.</li>
+        <li>Allows editing of member email, mobile number, role, and team membership.</li>
+        <li>Supports deletion of members with a confirmation prompt to reduce accidental removal.</li>
         <li>When a member is deleted, they lose access to the private member area until they are approved again.</li>
       </ul>
       <div class="note">
         Member approval and elevated permissions are intentionally separate. Approval creates a member.
-        Administrative elevation should happen only inside Members, with intent and review.
+        Administrative elevation should happen only inside Manage Members, with intent and review.
       </div>
 
-      <h3>4.5 Team Planning</h3>
+      <h3>4.6 Team Planning</h3>
       <p>
         Team Planning is the structured ministry scheduling tool for Sunday service operations. It is
         designed around one person per role for each activity, helping church leaders avoid duplication
@@ -594,19 +631,27 @@
       <h4>Core planning workflow</h4>
       <ol>
         <li>Select the Sunday and church context.</li>
+        <li>Choose the activity that needs planning.</li>
         <li>Assign people to the required ministry roles.</li>
         <li>Confirm the activity plan.</li>
-        <li>Publish assignments to the relevant members.</li>
+        <li>Move back to the top of the planner to continue planning other activities.</li>
       </ol>
       <h4>Important planning behaviors</h4>
       <ul>
         <li>Confirmation is idempotent for the same person, role, church, and Sunday combination.</li>
+        <li>The Confirm activity plan button changes to Activity planned when the current draft is already saved, which helps prevent repeat clicking.</li>
+        <li>After planning is confirmed, the planner scrolls back to the top selection controls so another activity can be planned immediately.</li>
+        <li>The planner suggests likely assignees for a role based on previous assignments.</li>
         <li>Members can accept or decline assignments from their app.</li>
         <li>If an assignment is removed, the member no longer sees it as active.</li>
-        <li>Archived Sundays can be reviewed later for service history and comparison.</li>
+        <li>On mobile, planning uses a tap-based flow instead of drag-and-drop, making role assignment easier on a phone.</li>
+        <li>Team leaders can plan activities for their own teams and can view a My team members card inside Team Planning to support those assignments.</li>
+        <li>Sunday service order now uses Current Sunday and Next Sunday selectors instead of showing two Sundays back to back.</li>
+        <li>Service order editing is restricted to super admins, church admins, and pastors. Team leaders can plan activities but cannot change service order.</li>
+        <li>Archived Sundays can be reviewed later for service history and export.</li>
       </ul>
 
-      <h3>4.6 Announcements and Events</h3>
+      <h3>4.7 Announcements and Events</h3>
       <p>
         This section manages outgoing communication and scheduled event visibility. It supports both
         church-specific communication and common network communication.
@@ -620,19 +665,22 @@
       </ul>
       <h4>Published events</h4>
       <ul>
-        <li>Publish events as church-specific or common Bethel events.</li>
+        <li>Super admins can publish both church-specific and common Bethel events.</li>
+        <li>Church admins and pastors can publish church-specific events only.</li>
         <li>Attach posters to improve visibility for members.</li>
         <li>Manage events in separate lower sections for church-specific events and common events.</li>
-        <li>Delete published events from those management tiles.</li>
+        <li>Use week filters such as This week, Next week, and All events to focus the event-management lists.</li>
+        <li>Use Cancel or Cancel Event actions instead of generic delete wording for event management.</li>
+        <li>Common published events can be cancelled only by super admin.</li>
       </ul>
       <h4>Default recurring meetings</h4>
       <ul>
         <li>Common meetings such as Daily Intercessory Prayer, Mid Week Meeting, and Youth Meeting are represented in the admin model.</li>
         <li>Church-specific default meetings, including Sunday Service and church recurring meetings, are also represented.</li>
-        <li>Admins can delete specific occurrences where a meeting does not take place.</li>
+        <li>Admins can cancel specific occurrences where a meeting does not take place.</li>
       </ul>
 
-      <h3>4.7 Churches And Teams</h3>
+      <h3>4.8 Churches And Teams</h3>
       <p>
         Churches And Teams is the structural configuration area. It manages the physical and operational
         identity of each church.
@@ -644,12 +692,16 @@
         <li>Keep church naming, service information, and public-facing details consistent.</li>
       </ul>
       <p>
+        This section is intentionally super-admin only. Church admins and pastors do not edit other
+        churches through this area.
+      </p>
+      <p>
         Because Sunday Service and other recurring meeting behavior depend on church service time and
         church metadata, this section has downstream impact on the calendar and meeting experience in the
         User App.
       </p>
 
-      <h3>4.8 Role Matrix</h3>
+      <h3>4.9 Role Matrix</h3>
       <p>
         Role Matrix functions as a reference view for the permission model. It helps leadership understand
         the intent of each role even though enforcement is ultimately controlled by application logic and
@@ -658,29 +710,31 @@
       <ul>
         <li>Super Admin: broad cross-church authority.</li>
         <li>Church Admin: strong local church operational authority.</li>
-        <li>Pastor: church leadership role with practical visibility but more limited destructive authority in some flows.</li>
-        <li>Volunteer and Member: narrower service and participation roles.</li>
+        <li>Pastor: same practical operational privileges as church admin inside the dashboard, except that Churches And Teams remains super-admin only.</li>
+        <li>Team Leader: planning-focused role for their teams only. Team leaders do not see Approval Queue, Add Members and Teams, or Manage Members.</li>
+        <li>Member and guest: not allowed into the admin dashboard.</li>
       </ul>
       <p>
         Whether the Role Matrix remains visible is a product-design choice. It is useful as a reference,
         but it is not the source of permission truth.
       </p>
 
-      <h3>4.9 Help</h3>
+      <h3>4.10 Help</h3>
       <p>
         The Admin Help section is a built-in operating guide that explains what each dashboard area is for,
         how to move through the app in a safe daily order, and how to avoid common mistakes such as mixing
         approval work with role elevation or losing track of Sunday planning responsibilities.
       </p>
 
-      <h3>4.10 Recommended admin operating workflow</h3>
+      <h3>4.11 Recommended admin operating workflow</h3>
       <ol>
         <li>Start in Overview.</li>
-        <li>Open Approval Queue for new members and prayer moderation.</li>
-        <li>Use Members to verify the right role, email, and team configuration.</li>
+        <li>Open Approval Queue for new members and prayer moderation when your role includes approval rights.</li>
+        <li>Use Add Members and Teams to shape structure if your role includes setup rights.</li>
+        <li>Use Manage Members to verify the right role, email, mobile number, and team configuration when your role includes member-management rights.</li>
         <li>Use Team Planning to shape and confirm Sunday service activity plans.</li>
         <li>Use Announcements and Events to publish current communication and upcoming meetings.</li>
-        <li>Use Churches And Teams when church identity, service time, or contact structure changes.</li>
+        <li>Use Churches And Teams when church identity, service time, or contact structure changes and your role includes that section.</li>
       </ol>
     </section>
 
@@ -692,6 +746,7 @@
         <li>Google sign-in identifies the account, but approval governs member access.</li>
         <li>Church selection during request flow determines the approval route.</li>
         <li>Member deletion removes effective access to the private member area.</li>
+        <li>Only Super Admin, Church Admin, Pastor, and Team Leader roles are allowed into the admin dashboard.</li>
       </ul>
 
       <h3>5.2 Prayer governance</h3>
@@ -714,6 +769,7 @@
         <li>The User App has been optimized for mobile use with fixed navigation, section grouping, and reduced long-page scrolling.</li>
         <li>Auto-scroll behavior is used to bring the user directly to relevant tiles after tab selection.</li>
         <li>Calendar tiles are visually simplified on phone screens.</li>
+        <li>The Admin App now follows the same mobile-first principle with a fixed title strip, compact tab row, and a top church selector for super admins.</li>
       </ul>
 
       <h3>5.5 Closing summary</h3>

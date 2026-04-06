@@ -144,6 +144,8 @@ export function subscribeToMemberAssignments(
     return () => undefined;
   }
 
+  const db = firestoreDb;
+
   const assignmentsQuery = query(
     collection(firestoreDb, 'scheduleAssignments'),
     where('assignedUserId', '==', uid),
@@ -162,6 +164,107 @@ export function subscribeToMemberAssignments(
       onError?.(normalizeError(error, 'Unable to load your team assignments.'));
     },
   );
+}
+
+export function subscribeToTeamPlanAssignments(
+  churchId: string,
+  visibleTeamNames: string[],
+  serviceDates: string[],
+  allowChurchWide: boolean,
+  onData: (assignments: MemberAssignment[]) => void,
+  onError?: (error: Error) => void,
+) {
+  const normalizedServiceDates = Array.from(new Set(serviceDates.filter(Boolean)));
+  const normalizedTeamNames = Array.from(new Set(visibleTeamNames.map((teamName) => teamName.trim()).filter(Boolean)));
+
+  if (!churchId || normalizedServiceDates.length === 0) {
+    onData([]);
+    return () => undefined;
+  }
+
+  if (!firestoreDb) {
+    const fallbackAssignments = dedupeAssignments(
+      mockAssignments.filter((assignment) =>
+        assignment.churchId === churchId
+        && normalizedServiceDates.includes(normalizeSundayDateKey(assignment.serviceDate))
+        && (allowChurchWide || normalizedTeamNames.includes(assignment.teamName.trim())),
+      ),
+    );
+    onData(fallbackAssignments);
+    return () => undefined;
+  }
+
+  const db = firestoreDb;
+
+  const assignmentMap = new Map<string, MemberAssignment>();
+  const emitAssignments = () => {
+    const assignments = dedupeAssignments(Array.from(assignmentMap.values()))
+      .sort((left, right) =>
+        left.serviceDate.localeCompare(right.serviceDate)
+        || left.teamName.localeCompare(right.teamName)
+        || left.roleName.localeCompare(right.roleName)
+        || left.assignedTo.localeCompare(right.assignedTo),
+      );
+    onData(assignments);
+  };
+
+  const listeners = allowChurchWide
+    ? [
+        onSnapshot(
+          query(
+            collection(db, 'scheduleAssignments'),
+            where('churchId', '==', churchId),
+            where('serviceDate', 'in', normalizedServiceDates),
+          ),
+          (snapshot) => {
+            const nextIds = new Set(snapshot.docs.map((item) => item.id));
+            Array.from(assignmentMap.keys()).forEach((assignmentId) => {
+              if (!nextIds.has(assignmentId)) {
+                assignmentMap.delete(assignmentId);
+              }
+            });
+
+            snapshot.docs.forEach((item) => {
+              assignmentMap.set(item.id, mapAssignment(item.id, item.data() as Record<string, unknown>));
+            });
+            emitAssignments();
+          },
+          (error) => {
+            onError?.(normalizeError(error, 'Unable to load the team plan right now.'));
+          },
+        ),
+      ]
+    : normalizedTeamNames.map((teamName) =>
+        onSnapshot(
+          query(
+            collection(db, 'scheduleAssignments'),
+            where('churchId', '==', churchId),
+            where('teamId', '==', teamName),
+            where('serviceDate', 'in', normalizedServiceDates),
+          ),
+          (snapshot) => {
+            const scopedPrefix = `${churchId}::${teamName}::`;
+            const nextIds = new Set(snapshot.docs.map((item) => item.id));
+            Array.from(assignmentMap.keys()).forEach((assignmentId) => {
+              if (assignmentId.startsWith(scopedPrefix) && !nextIds.has(assignmentId.slice(scopedPrefix.length))) {
+                assignmentMap.delete(assignmentId);
+              }
+            });
+
+            snapshot.docs.forEach((item) => {
+              assignmentMap.set(`${churchId}::${teamName}::${item.id}`, mapAssignment(item.id, item.data() as Record<string, unknown>));
+            });
+            emitAssignments();
+          },
+          (error) => {
+            onError?.(normalizeError(error, 'Unable to load the team plan right now.'));
+          },
+        ),
+      );
+
+  return () => {
+    listeners.forEach((unsubscribe) => unsubscribe());
+  };
 }
 
 export async function updateMemberAssignmentResponse(

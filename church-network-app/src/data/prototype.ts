@@ -13,6 +13,7 @@ export type NetworkChurch = {
   youtubeUrl?: string;
   instagramUrl?: string;
   facebookUrl?: string;
+  teams: string[];
 };
 
 export const publicHighlights = [
@@ -62,6 +63,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
   {
     id: 'berlin',
@@ -76,6 +78,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
   {
     id: 'frankfurt',
@@ -90,6 +93,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
   {
     id: 'stuttgart',
@@ -104,6 +108,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
   {
     id: 'nuremberg',
@@ -118,6 +123,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
   {
     id: 'freiburg',
@@ -132,6 +138,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
   {
     id: 'osnabruck',
@@ -146,6 +153,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
   {
     id: 'leipzig',
@@ -160,6 +168,7 @@ export const networkChurches: NetworkChurch[] = [
     whatsappUrl: 'https://wa.me/491725818673',
     weeklyMeetingUrl: 'https://us06web.zoom.us/j/85421151544?pwd=TjNYd080NitrRWhwOWdwUTN1c2kyQT09',
     youtubeUrl: 'https://www.youtube.com/@bipcgermany',
+    teams: supportedTeams,
   },
 ];
 

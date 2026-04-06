@@ -34,6 +34,9 @@ function mapChurch(id: string, rawValue: Record<string, unknown>): NetworkChurch
     youtubeUrl: normalizeString(rawValue.youtubeUrl, fallbackChurch?.youtubeUrl ?? '') || undefined,
     instagramUrl: normalizeString(rawValue.instagramUrl) || undefined,
     facebookUrl: normalizeString(rawValue.facebookUrl) || undefined,
+    teams: Array.isArray(rawValue.teams)
+      ? rawValue.teams.filter((team): team is string => typeof team === 'string' && team.trim().length > 0)
+      : fallbackChurch?.teams ?? [],
   };
 }
 

@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { firestoreDb } from '../config/firebase';
 import type { AuthSession } from './auth';
@@ -34,35 +34,71 @@ export async function createAccessRequest(authSession: AuthSession, payload: Acc
   }
 
   try {
-    await setDoc(
-      doc(firestoreDb, 'users', authSession.uid),
-      {
-        uid: authSession.uid,
-        email: authSession.email.trim().toLowerCase(),
-        displayName: payload.displayName.trim(),
-        photoUrl: authSession.photoUrl || null,
-        phoneNumber: payload.phoneNumber.trim() || null,
-        phoneVerificationStatus: payload.phoneNumber.trim() ? 'pending' : 'missing',
-        phoneVerifiedAt: null,
-        primaryChurchId: payload.requestedChurchId,
-        approvalStatus: 'pending',
-        pendingChurchId: payload.requestedChurchId,
-        roleFlags: {
-          member: true,
+    const userRef = doc(firestoreDb, 'users', authSession.uid);
+    const existingUserSnapshot = await getDoc(userRef);
+    const existingApprovalStatus = existingUserSnapshot.exists()
+      ? (existingUserSnapshot.data() as Record<string, unknown>).approvalStatus
+      : null;
+
+    if (existingApprovalStatus === 'pending') {
+      throw new Error('Your request is already pending. You can submit again only after a church admin rejects the current request.');
+    }
+
+    if (existingApprovalStatus === 'approved') {
+      throw new Error('Your member access is already approved. You do not need to submit another request.');
+    }
+
+    const normalizedEmail = authSession.email.trim().toLowerCase();
+    const normalizedDisplayName = payload.displayName.trim();
+    const normalizedPhoneNumber = payload.phoneNumber.trim() || null;
+    const normalizedPhotoUrl = authSession.photoUrl || null;
+
+    if (!existingUserSnapshot.exists()) {
+      await setDoc(
+        userRef,
+        {
+          uid: authSession.uid,
+          email: normalizedEmail,
+          displayName: normalizedDisplayName,
+          photoUrl: normalizedPhotoUrl,
+          phoneNumber: normalizedPhoneNumber,
+          phoneVerificationStatus: normalizedPhoneNumber ? 'pending' : 'missing',
+          phoneVerifiedAt: null,
+          primaryChurchId: payload.requestedChurchId,
+          approvalStatus: 'pending',
+          pendingChurchId: payload.requestedChurchId,
+          roleFlags: {
+            member: true,
+          },
+          churchAccess: {},
+          teamAccess: {},
+          updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
         },
-        churchAccess: {},
-        teamAccess: {},
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
+        { merge: true },
+      );
+    } else {
+      await setDoc(
+        userRef,
+        {
+          uid: authSession.uid,
+          email: normalizedEmail,
+          displayName: normalizedDisplayName,
+          photoUrl: normalizedPhotoUrl,
+          phoneNumber: normalizedPhoneNumber,
+          primaryChurchId: payload.requestedChurchId,
+          pendingChurchId: payload.requestedChurchId,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
 
     const accessRequestRef = await addDoc(collection(firestoreDb, 'accessRequests'), {
       uid: authSession.uid,
-      fullName: payload.displayName.trim(),
-      email: authSession.email.trim().toLowerCase(),
-      phoneNumber: payload.phoneNumber.trim() || null,
+      fullName: normalizedDisplayName,
+      email: normalizedEmail,
+      phoneNumber: normalizedPhoneNumber,
       churchId: payload.requestedChurchId,
       requestedChurchId: payload.requestedChurchId,
       requestedRoles: ['member'],

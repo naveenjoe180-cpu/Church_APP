@@ -33,6 +33,25 @@ function normalizeTimestamp(value: Timestamp | string | null | undefined, fallba
   return value.toDate().toISOString();
 }
 
+function normalizeAccessRequestTimestamp(
+  createdAt: Timestamp | string | null | undefined,
+  requestedAt: Timestamp | string | null | undefined,
+) {
+  if (createdAt instanceof Timestamp) {
+    return createdAt.toDate().toISOString();
+  }
+
+  if (requestedAt) {
+    return normalizeTimestamp(requestedAt);
+  }
+
+  if (typeof createdAt === 'string' && createdAt.trim()) {
+    return createdAt;
+  }
+
+  return 'Pending timestamp';
+}
+
 function normalizeOptionalTimestamp(value: Timestamp | string | null | undefined) {
   if (!value) {
     return undefined;
@@ -98,7 +117,10 @@ function mapAccessRequest(id: string, rawValue: Record<string, unknown>): Access
           : '',
     requestedRoles: ['member'],
     note: typeof rawValue.note === 'string' ? rawValue.note : typeof rawValue.notes === 'string' ? rawValue.notes : '',
-    requestedAt: normalizeTimestamp((rawValue.createdAt as Timestamp | null | undefined) ?? (rawValue.requestedAt as Timestamp | string | null | undefined)),
+    requestedAt: normalizeAccessRequestTimestamp(
+      rawValue.createdAt as Timestamp | string | null | undefined,
+      rawValue.requestedAt as Timestamp | string | null | undefined,
+    ),
     status:
       rawValue.status === 'approved' || rawValue.status === 'rejected' || rawValue.status === 'pending'
         ? rawValue.status
@@ -755,6 +777,7 @@ export async function updateMemberAssignments(payload: {
   memberId: string;
   churchId: string;
   email: string;
+  phoneNumber: string;
   roleKey: RoleKey;
   teamNames: string[];
 }) {
@@ -779,6 +802,7 @@ export async function updateMemberAssignments(payload: {
   }, {});
   const effectiveRole = getEffectiveRole({ [payload.roleKey]: true }, payload.teamNames);
   const normalizedEmail = payload.email.trim().toLowerCase();
+  const normalizedPhoneNumber = payload.phoneNumber.trim();
 
   if (!normalizedEmail) {
     throw new Error('Add a valid email address before saving the member.');
@@ -789,7 +813,8 @@ export async function updateMemberAssignments(payload: {
     approvalStatus: 'approved',
     primaryChurchId: payload.churchId,
     primaryTeamName: payload.teamNames[0] || null,
-    phoneVerificationStatus: 'missing',
+    phoneNumber: normalizedPhoneNumber || null,
+    phoneVerificationStatus: normalizedPhoneNumber ? 'pending' : 'missing',
     phoneVerifiedAt: null,
     ...buildNestedBooleanFields('churchAccess', [payload.churchId]),
     ...nextRoleFlags,
@@ -806,9 +831,13 @@ export async function deleteManagedMember(memberId: string) {
     throw new Error('Firebase is not configured for the admin dashboard.');
   }
 
+  const privateProfileRef = doc(firestoreDb, 'userPrivateProfiles', memberId);
+  const privateProfileSnapshot = await getDoc(privateProfileRef);
   const batch = writeBatch(firestoreDb);
   batch.delete(doc(firestoreDb, 'users', memberId));
-  batch.delete(doc(firestoreDb, 'userPrivateProfiles', memberId));
+  if (privateProfileSnapshot.exists()) {
+    batch.delete(privateProfileRef);
+  }
   await batch.commit();
 }
 

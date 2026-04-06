@@ -114,7 +114,7 @@ export async function registerMemberNotifications(context: RegistrationContext) 
   if (Platform.OS === 'web') {
     return {
       status: 'unsupported',
-      message: 'Browser push notifications are intentionally disabled. Push alerts are available in the mobile app only.',
+      message: '',
     } satisfies NotificationRegistrationResult;
   }
 
