@@ -16,32 +16,6 @@ export type NetworkChurch = {
   teams: string[];
 };
 
-export const publicHighlights = [
-  {
-    title: 'Church Locations',
-    body: 'Guests can browse the Germany church locations and choose the church they belong to during signup.',
-  },
-  {
-    title: 'Service Times',
-    body: 'Sunday services, online meeting links, and church contact details stay visible even before approval.',
-  },
-  {
-    title: 'Media And Links',
-    body: 'The network YouTube channel and church-specific social links stay available in guest mode.',
-  },
-];
-
-export const privateModules = [
-  'Announcements',
-  'Event Calendar',
-  'Team Schedules',
-  'Ministry Updates',
-  'Prayer Wall',
-  'Document Sharing',
-  'Member Directory',
-  'Push Notifications',
-];
-
 export const supportedTeams = [
   'Worship Team',
   'Speakers Team',
@@ -182,29 +156,6 @@ export const signInMethods = [
     key: 'email' as const,
     title: 'Email And Password',
     body: 'Useful as a fallback for members who need a non-Google account path.',
-  },
-];
-
-export const roleSummary = [
-  {
-    title: 'Network Super Admin',
-    body: 'Manages all churches, sees all members across the network, and controls network-wide settings.',
-  },
-  {
-    title: 'Church Admin',
-    body: 'Approves members, manages one church only, and assigns local roles and teams after approval.',
-  },
-  {
-    title: 'Pastor',
-    body: 'Sees expanded member details within the assigned church and helps oversee ministry content.',
-  },
-  {
-    title: 'Team Leader',
-    body: 'Plans ministry updates, volunteer schedules, and team assignments inside the assigned church.',
-  },
-  {
-    title: 'Volunteer And Member',
-    body: 'Joins the approved church space, receives updates, and accesses only assigned teams and roles.',
   },
 ];
 

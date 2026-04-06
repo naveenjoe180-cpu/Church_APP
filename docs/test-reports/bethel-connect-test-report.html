@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bethel Connect Test Report</title>
+  <style>
+    :root {
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --panel: #f8fafc;
+      --navy: #17324d;
+      --gold: #c89b3c;
+      --green: #0f766e;
+      --amber: #b45309;
+      --red: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: white;
+      line-height: 1.45;
+    }
+    .page {
+      max-width: 1020px;
+      margin: 0 auto;
+      padding: 40px 42px 56px;
+    }
+    h1, h2, h3 {
+      margin: 0 0 12px;
+      color: var(--navy);
+      line-height: 1.2;
+    }
+    h1 { font-size: 34px; }
+    h2 {
+      font-size: 22px;
+      margin-top: 34px;
+      padding-top: 10px;
+      border-top: 2px solid var(--line);
+    }
+    h3 {
+      font-size: 17px;
+      margin-top: 24px;
+    }
+    p { margin: 0 0 12px; }
+    ul {
+      margin: 8px 0 14px 20px;
+      padding: 0;
+    }
+    li { margin: 0 0 6px; }
+    .hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, #f8fbff 0%, #fff9ef 100%);
+      border-radius: 18px;
+      padding: 26px 28px;
+      margin-bottom: 22px;
+    }
+    .eyebrow {
+      color: var(--gold);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0 8px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      background: var(--panel);
+    }
+    .metric strong {
+      display: block;
+      font-size: 28px;
+      color: var(--navy);
+    }
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .callout {
+      border-left: 4px solid var(--green);
+      background: #f0fdf9;
+      padding: 14px 16px;
+      border-radius: 10px;
+      margin: 16px 0;
+    }
+    .risk {
+      border-left-color: var(--amber);
+      background: #fff7ed;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 18px;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 9px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: #eef2f7;
+      color: var(--navy);
+      font-weight: 700;
+    }
+    .status-pass { color: var(--green); font-weight: 700; }
+    .status-risk { color: var(--amber); font-weight: 700; }
+    .status-warn { color: var(--red); font-weight: 700; }
+    .test-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 18px;
+      background: white;
+      margin: 12px 0;
+    }
+    .test-id {
+      color: var(--gold);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+    .test-verdict {
+      font-weight: 700;
+      margin-top: 8px;
+    }
+    .footer-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 24px;
+    }
+    @media print {
+      .page { max-width: none; padding: 24px 28px 36px; }
+      .summary-grid { grid-template-columns: repeat(4, 1fr); }
+      .test-card, table, .metric, .callout { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow">Bethel Connect</div>
+      <h1>Comprehensive Test Report</h1>
+      <p>This report consolidates the final locally executed QA pass for the Bethel Connect user app, admin app, and backend functions. It explains what was tested, how each test group was executed, and the verdict for each group.</p>
+      <p class="meta">Generated on 2026-04-06 for the current workspace state in <strong>C:\Users\navee\OneDrive\Documents\New project</strong>.</p>
+    </section>
+
+    <section>
+      <h2>Executive Summary</h2>
+      <div class="summary-grid">
+        <article class="metric">
+          <strong>25</strong>
+          <span>Requirement and fallback-risk checks passed</span>
+        </article>
+        <article class="metric">
+          <strong>20</strong>
+          <span>Extended rules/config/build/resource checks passed</span>
+        </article>
+        <article class="metric">
+          <strong>9</strong>
+          <span>Browser smoke/runtime checks passed</span>
+        </article>
+        <article class="metric">
+          <strong>9</strong>
+          <span>Low-severity transitive findings remain in functions only</span>
+        </article>
+      </div>
+      <div class="callout">
+        <strong>Overall verdict:</strong> All locally executable requirement, rules-contract, configuration, compile, build, smoke, and resource-budget checks passed. Dependency audits are clean for the user app and admin app. The only remaining security findings in this final pass are 9 low-severity transitive vulnerabilities in the functions dependency chain (`firebase-admin` / `firebase-functions`).
+      </div>
+    </section>
+
+    <section>
+      <h2>Test Scope</h2>
+      <ul>
+        <li>User app requirement verification</li>
+        <li>Admin app requirement verification</li>
+        <li>Backend rule and function-presence verification</li>
+        <li>Fallback-related stability verification</li>
+        <li>Firestore rules contract checks</li>
+        <li>Firebase / Expo / hosting configuration integrity checks</li>
+        <li>TypeScript compile checks for all projects</li>
+        <li>Production build/export validation</li>
+        <li>Deployment-shape smoke checks on built HTML output</li>
+        <li>Bundle-size/resource budget checks</li>
+        <li>Headless browser smoke checks for desktop/mobile rendering</li>
+        <li>Backend-blocked/offline browser resilience checks</li>
+        <li>Repeated reload stability and parallel page-load concurrency smoke checks</li>
+        <li>Dependency audits for all three packages</li>
+        <li>Tracked-secret scan in the workspace source files</li>
+      </ul>
+      <div class="callout risk">
+        <strong>Still out of scope:</strong> true load testing, real-device memory profiling, long-duration soak tests, multi-user concurrency simulation, live Cloud Functions runtime verification, and physical push-notification delivery checks were not executed in this pass.
+      </div>
+    </section>
+
+    <section>
+      <h2>Test Environment</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Environment</th>
+            <th>Method</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>User app</td>
+            <td>Expo / React Native / TypeScript</td>
+            <td>Requirement checks, TypeScript compile, Expo web export, bundle inspection, browser smoke/runtime checks, npm audit</td>
+            <td class="status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td>Admin app</td>
+            <td>React / Vite / TypeScript</td>
+            <td>Requirement checks, TypeScript compile, production build, hosting-path smoke check, browser smoke/runtime checks, npm audit</td>
+            <td class="status-pass">Pass</td>
+          </tr>
+          <tr>
+            <td>Functions</td>
+            <td>Firebase Functions / TypeScript</td>
+            <td>Requirement checks, Firestore-rules contract checks, TypeScript build, npm audit</td>
+            <td class="status-risk">Pass with low-risk audit findings</td>
+          </tr>
+          <tr>
+            <td>Workspace security</td>
+            <td>Source review</td>
+            <td>Secret scan and dependency review</td>
+            <td class="status-pass">Pass with follow-up on functions audit</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Tests Performed</h2>
+
+      <article class="test-card">
+        <div class="test-id">T01</div>
+        <h3>Requirement-based user app checks</h3>
+        <p><strong>Goal:</strong> verify the user-facing flows established during the project conversations are present in the current codebase.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Scanned the user app source for the implemented guest/member navigation structure.</li>
+          <li>Verified access-request instructions, mandatory mobile-number flow, and explicit church selection.</li>
+          <li>Verified rejection-reason display after admin rejection.</li>
+          <li>Verified `My Team Plan`, Sunday toggles, team switching, and `No plan yet` summaries.</li>
+          <li>Verified push-notification config fallback no longer depends only on `EXPO_PUBLIC_EXPO_PROJECT_ID`.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T02</div>
+        <h3>Requirement-based admin app checks</h3>
+        <p><strong>Goal:</strong> verify the agreed admin structure, role restrictions, and destructive-action safeguards.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Verified `Manage Members` and `Add Members and Teams` navigation labels.</li>
+          <li>Verified team-leader visibility restrictions.</li>
+          <li>Verified publish restrictions for announcements and events.</li>
+          <li>Verified `Cancel Event` wording and confirmation prompts.</li>
+          <li>Verified `Current Sunday` / `Next Sunday` service-order selectors.</li>
+          <li>Verified rejection reason is required before rejecting a request.</li>
+          <li>Verified member deletion requires explicit confirmation.</li>
+          <li>Verified only admin-capable roles are allowed into the admin app.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T03</div>
+        <h3>Requirement-based backend checks</h3>
+        <p><strong>Goal:</strong> verify critical backend protections and scheduler presence are reflected in the current code.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Verified rejection reasons are written through the access-request update path.</li>
+          <li>Verified signup requests remain locked to the `member` role in app code and rules.</li>
+          <li>Verified the cleanup scheduler exists for expired content and old reminder/log documents.</li>
+          <li>Verified mobile notification registration writes Expo device records to Firestore.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T04</div>
+        <h3>Stability checks for incorrect fallback behavior</h3>
+        <p><strong>Goal:</strong> ensure backend failures no longer masquerade as valid live data.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Checked the admin app error handlers for access requests and assignments.</li>
+          <li>Checked the user app announcements/events and team-plan services for Firebase-unavailable fallbacks.</li>
+          <li>Confirmed the incorrect mock-data fallback paths are removed from the tested live-data subscriptions.</li>
+          <li>Reran the requirement and risk checks after remediation.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T05</div>
+        <h3>Firestore rules contract checks</h3>
+        <p><strong>Goal:</strong> cover the most sensitive authorization boundaries in the current rules file.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Verified self-signup stays locked to a pending member-only payload.</li>
+          <li>Verified self-updates for unapproved users stay limited to safe profile fields.</li>
+          <li>Verified churches remain super-admin write-only.</li>
+          <li>Verified network-scope event writes stay super-admin only.</li>
+          <li>Verified assignment visibility and assignment-maintenance rules for members, team leaders, and church managers.</li>
+          <li>Verified notification-device ownership and access-request visibility rules.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass (8 checks)</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T06</div>
+        <h3>Configuration integrity checks</h3>
+        <p><strong>Goal:</strong> ensure the app does not accidentally boot with missing or incorrect Firebase / Expo / hosting config assumptions.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Verified both apps gate Firebase initialization behind explicit config completeness checks.</li>
+          <li>Verified the user app resolves the Expo project id from env vars or Expo/EAS runtime config.</li>
+          <li>Verified the Android Google services file is wired through the EAS file-secret fallback.</li>
+          <li>Verified the admin build still supports the `/admin/` hosting base path.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass (5 checks)</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T07</div>
+        <h3>TypeScript compile checks</h3>
+        <p><strong>Goal:</strong> catch regressions, type mismatches, and dead references after the recent changes.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Ran `npx.cmd tsc --noEmit` in `church-network-app`.</li>
+          <li>Ran `npx.cmd tsc --noEmit` in `church-network-admin`.</li>
+          <li>Ran `npx.cmd tsc --noEmit` in `functions`.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T08</div>
+        <h3>Production build and export checks</h3>
+        <p><strong>Goal:</strong> verify that the current source can still produce deployable build outputs.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Ran Expo web export for the user app.</li>
+          <li>Ran Vite production build for the admin app with `VITE_BASE_PATH=/admin/`.</li>
+          <li>Ran TypeScript build for the functions project.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T09</div>
+        <h3>Deployment-shape smoke checks</h3>
+        <p><strong>Goal:</strong> confirm the built outputs are shaped correctly for hosted deployment.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Verified the built user export contains a deployable `index.html` and JavaScript bundles.</li>
+          <li>Verified the built admin output contains deployable HTML, JS, and CSS assets.</li>
+          <li>Verified the admin built HTML points to `/admin/assets/...` paths.</li>
+          <li>Verified both built HTML shells include a root mount node and boot script tags.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass (4 checks)</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T10</div>
+        <h3>Resource / bundle-budget checks</h3>
+        <p><strong>Goal:</strong> add a repeatable local performance signal for emitted web assets.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Measured total emitted user-app JavaScript size.</li>
+          <li>Measured the largest emitted admin-app JavaScript chunk.</li>
+          <li>Measured total emitted admin CSS size.</li>
+        </ul>
+        <p><strong>Measured values:</strong></p>
+        <ul>
+          <li>User total JS: `1.40 MB` within the local `2.0 MB` review budget</li>
+          <li>Largest admin JS chunk: `673.5 KB` within the local `1.0 MB` review budget</li>
+          <li>Admin CSS: `42.0 KB` within the local `150 KB` review budget</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T11</div>
+        <h3>Browser smoke and runtime checks</h3>
+        <p><strong>Goal:</strong> add executable runtime coverage for the built user and admin apps in real browser engines.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Launched Microsoft Edge headless against local static servers for the built user and admin apps.</li>
+          <li>Verified signed-out desktop shell rendering for both apps.</li>
+          <li>Verified mobile viewport rendering for both apps.</li>
+          <li>Blocked Firebase/Google backend requests and verified both apps still rendered usable signed-out shells.</li>
+          <li>Repeated reload cycles to catch client-side crash regressions.</li>
+          <li>Opened multiple user/admin pages in parallel to add a concurrency smoke check.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass (9 browser/runtime checks)</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T12</div>
+        <h3>Dependency security audit</h3>
+        <p><strong>Goal:</strong> identify known vulnerable packages in production dependencies for each package in the workspace.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Ran `npm.cmd install` in `church-network-admin` and `functions` to generate npm lockfiles and make `npm audit` executable there.</li>
+          <li>Ran `npm.cmd audit --omit=dev --json` in `church-network-app`.</li>
+          <li>Ran `npm.cmd audit --omit=dev --json` in `church-network-admin`.</li>
+          <li>Ran `npm.cmd audit --omit=dev --json` in `functions`.</li>
+        </ul>
+        <p><strong>Results:</strong></p>
+        <ul>
+          <li>User app: `0` production vulnerabilities</li>
+          <li>Admin app: `0` production vulnerabilities</li>
+          <li>Functions: `9` low-severity transitive vulnerabilities in the current Firebase admin/functions stack</li>
+        </ul>
+        <p class="test-verdict"><span class="status-risk">Verdict: Pass with low-risk follow-up</span></p>
+      </article>
+
+      <article class="test-card">
+        <div class="test-id">T13</div>
+        <h3>Tracked-secret scan</h3>
+        <p><strong>Goal:</strong> check for obvious committed secrets in normal workspace source files.</p>
+        <p><strong>Steps:</strong></p>
+        <ul>
+          <li>Searched the workspace for Firebase API-key patterns, Google client IDs, and private-key markers.</li>
+          <li>Excluded `.git`, `node_modules`, and built output folders from the scan.</li>
+        </ul>
+        <p class="test-verdict"><span class="status-pass">Verdict: Pass</span></p>
+      </article>
+    </section>
+
+    <section>
+      <h2>Verdict Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Check Group</th>
+            <th>Verdict</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Requirement-based user/admin/backend checks</td>
+            <td class="status-pass">Pass</td>
+            <td>`25 passed, 0 failed` in the current requirement-based report.</td>
+          </tr>
+          <tr>
+            <td>Fallback stability checks</td>
+            <td class="status-pass">Pass</td>
+            <td>Incorrect mock-data fallback behavior is no longer present in the tested live-data failure paths.</td>
+          </tr>
+          <tr>
+            <td>Firestore rules contract checks</td>
+            <td class="status-pass">Pass</td>
+            <td>`8 passed, 0 failed` in the extended-quality report.</td>
+          </tr>
+          <tr>
+            <td>Configuration integrity checks</td>
+            <td class="status-pass">Pass</td>
+            <td>`5 passed, 0 failed` in the extended-quality report.</td>
+          </tr>
+          <tr>
+            <td>Build smoke and deployment-shape checks</td>
+            <td class="status-pass">Pass</td>
+            <td>`4 passed, 0 failed` in the extended-quality report.</td>
+          </tr>
+          <tr>
+            <td>Resource / bundle-budget checks</td>
+            <td class="status-pass">Pass</td>
+            <td>`3 passed, 0 failed` within the local review budgets used for this pass.</td>
+          </tr>
+          <tr>
+            <td>Browser smoke/runtime checks</td>
+            <td class="status-pass">Pass</td>
+            <td>`9 passed, 0 failed` covering desktop/mobile shells, backend-blocked loads, repeated reloads, and parallel page-load smoke.</td>
+          </tr>
+          <tr>
+            <td>TypeScript compile checks</td>
+            <td class="status-pass">Pass</td>
+            <td>All three projects compiled successfully with `tsc --noEmit`.</td>
+          </tr>
+          <tr>
+            <td>Production build/export checks</td>
+            <td class="status-pass">Pass</td>
+            <td>User export, admin build, and functions build succeeded.</td>
+          </tr>
+          <tr>
+            <td>Dependency security</td>
+            <td class="status-risk">Pass with follow-up</td>
+            <td>User and admin audits are clean; functions still reports `9` low-severity transitive findings.</td>
+          </tr>
+          <tr>
+            <td>Secrets scan</td>
+            <td class="status-pass">Pass</td>
+            <td>No committed live secrets found in the scanned source files.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Remaining Risks and Limitations</h2>
+      <ul>
+        <li>The `functions` package still reports `9` low-severity transitive vulnerabilities in the current Firebase admin/functions dependency chain.</li>
+        <li>The admin build still emits a Vite large-chunk warning even though it remains inside the local 1.0 MB budget used in this pass.</li>
+        <li>This pass still did not include real device memory profiling, hours-long soak tests, or authenticated live-backend multi-user mutation races.</li>
+        <li>Live Cloud Functions runtime behavior and physical push-notification delivery were not treated as blocking failures here because they depend on deployment/runtime conditions outside this local workspace pass.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Final Verdict</h2>
+      <div class="callout">
+        The application is in a strong state for the locally executable test scope. Requirement-based checks, fallback-stability checks, rules-contract checks, configuration checks, compile/build validation, deployment-shape smoke checks, resource-budget checks, browser runtime smoke checks, and secret scanning all pass. The only remaining findings in this final pass are 9 low-severity transitive npm audit findings in the backend functions package.
+      </div>
+      <p class="footer-note">Supporting markdown and JSON reports are stored in the same folder as this document.</p>
+    </section>
+  </main>
+</body>
+</html>

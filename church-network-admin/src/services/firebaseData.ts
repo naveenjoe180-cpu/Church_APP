@@ -125,6 +125,7 @@ function mapAccessRequest(id: string, rawValue: Record<string, unknown>): Access
       rawValue.status === 'approved' || rawValue.status === 'rejected' || rawValue.status === 'pending'
         ? rawValue.status
         : 'pending',
+    rejectionReason: typeof rawValue.rejectionReason === 'string' ? rawValue.rejectionReason : undefined,
   };
 }
 
@@ -701,6 +702,7 @@ export async function writeAuditEntry(payload: {
 export async function updateAccessRequestStatus(
   request: AccessRequest,
   nextStatus: 'approved' | 'rejected',
+  rejectionReason?: string,
 ) {
   if (!firestoreDb) {
     throw new Error('Firebase is not configured for the admin dashboard.');
@@ -723,6 +725,7 @@ export async function updateAccessRequestStatus(
   batch.update(accessRequestRef, {
     status: nextStatus,
     requestedRoles: nextRoles,
+    rejectionReason: nextStatus === 'rejected' ? (rejectionReason?.trim() || null) : null,
     reviewedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -735,6 +738,7 @@ export async function updateAccessRequestStatus(
           approvalStatus: 'approved',
           primaryChurchId: request.churchId,
           pendingChurchId: null,
+          rejectionReason: null,
           phoneNumber: request.phoneNumber ?? null,
           phoneVerificationStatus: request.phoneNumber ? 'pending' : 'missing',
           phoneVerifiedAt: null,
@@ -745,6 +749,7 @@ export async function updateAccessRequestStatus(
       : {
           approvalStatus: 'rejected',
           pendingChurchId: null,
+          rejectionReason: rejectionReason?.trim() || null,
           updatedAt: serverTimestamp(),
         },
     { merge: true },

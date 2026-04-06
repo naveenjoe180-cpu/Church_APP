@@ -1,7 +1,7 @@
 import { collection, onSnapshot, orderBy, query, where, type FirestoreError, type Timestamp } from 'firebase/firestore';
 
 import { firestoreDb } from '../config/firebase';
-import { mockAnnouncements, mockEvents, type ChurchAnnouncement, type ChurchEventItem } from '../data/churchUpdates';
+import type { ChurchAnnouncement, ChurchEventItem } from '../data/churchUpdates';
 
 export type { ChurchAnnouncement, ChurchEventItem } from '../data/churchUpdates';
 
@@ -46,6 +46,28 @@ function normalizeOptionalTimestamp(value: Timestamp | string | null | undefined
 }
 
 function normalizeError(error: FirestoreError | Error | unknown, fallback: string) {
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 'permission-denied'
+  ) {
+    return new Error(
+      'Live church updates are blocked right now. Ask a church admin to publish the latest Firestore rules, then refresh the app.',
+    );
+  }
+
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 'unavailable'
+  ) {
+    return new Error(
+      'Live church updates could not be loaded right now. Check your internet connection and try again.',
+    );
+  }
+
   if (error instanceof Error) {
     return error;
   }
@@ -119,7 +141,8 @@ export function subscribeToChurchAnnouncements(
   onError?: (error: Error) => void,
 ) {
   if (!firestoreDb) {
-    onData(mockAnnouncements.filter((item) => item.churchId === churchId).filter(isAnnouncementVisible));
+    onData([]);
+    onError?.(new Error('Live church announcements are unavailable because Firebase is not configured for this app build.'));
     return () => undefined;
   }
 
@@ -150,11 +173,8 @@ export function subscribeToChurchEvents(
   onError?: (error: Error) => void,
 ) {
   if (!firestoreDb) {
-    onData(
-      mockEvents
-        .filter((item) => item.churchId === churchId || item.scopeType === 'network' || item.churchId === 'network')
-        .filter(isUpcomingEvent),
-    );
+    onData([]);
+    onError?.(new Error('Live church events are unavailable because Firebase is not configured for this app build.'));
     return () => undefined;
   }
 
@@ -214,11 +234,8 @@ export function subscribeToPublicCommonEvents(
   onError?: (error: Error) => void,
 ) {
   if (!firestoreDb) {
-    onData(
-      mockEvents
-        .filter((item) => item.scopeType === 'network' && item.isPublic)
-        .filter(isUpcomingEvent),
-    );
+    onData([]);
+    onError?.(new Error('Live common Bethel events are unavailable because Firebase is not configured for this app build.'));
     return () => undefined;
   }
 

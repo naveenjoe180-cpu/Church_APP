@@ -42,6 +42,17 @@ function normalizeError(error: FirestoreError | Error | unknown, fallback: strin
     );
   }
 
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 'unavailable'
+  ) {
+    return new Error(
+      'Prayer data could not be loaded right now. Check your internet connection and try again.',
+    );
+  }
+
   if (error instanceof Error) {
     return error;
   }

@@ -38,6 +38,7 @@ export type AccessRequest = {
   note: string;
   requestedAt: string;
   status: AccessRequestStatus;
+  rejectionReason?: string;
 };
 
 export type PrayerRequest = {

@@ -1,7 +1,7 @@
 import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where, type FirestoreError, type Timestamp } from 'firebase/firestore';
 
 import { firestoreDb } from '../config/firebase';
-import { mockAssignments, type MemberAssignment } from '../data/churchUpdates';
+import type { MemberAssignment } from '../data/churchUpdates';
 
 export type { MemberAssignment } from '../data/churchUpdates';
 
@@ -51,6 +51,28 @@ function normalizeDate(value: Timestamp | string | null | undefined, fallback: s
 }
 
 function normalizeError(error: FirestoreError | Error | unknown, fallback: string) {
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 'permission-denied'
+  ) {
+    return new Error(
+      'The team plan is blocked right now. Ask a church admin to publish the latest Firestore rules, then refresh the app.',
+    );
+  }
+
+  if (
+    typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 'unavailable'
+  ) {
+    return new Error(
+      'The team plan could not be loaded right now. Check your internet connection and try again.',
+    );
+  }
+
   if (error instanceof Error) {
     return error;
   }
@@ -140,7 +162,8 @@ export function subscribeToMemberAssignments(
   onError?: (error: Error) => void,
 ) {
   if (!firestoreDb) {
-    onData(dedupeAssignments(mockAssignments.filter((assignment) => assignment.churchId === churchId)));
+    onData([]);
+    onError?.(new Error('Live team assignments are unavailable because Firebase is not configured for this app build.'));
     return () => undefined;
   }
 
@@ -183,14 +206,8 @@ export function subscribeToTeamPlanAssignments(
   }
 
   if (!firestoreDb) {
-    const fallbackAssignments = dedupeAssignments(
-      mockAssignments.filter((assignment) =>
-        assignment.churchId === churchId
-        && normalizedServiceDates.includes(normalizeSundayDateKey(assignment.serviceDate))
-        && (allowChurchWide || normalizedTeamNames.includes(assignment.teamName.trim())),
-      ),
-    );
-    onData(fallbackAssignments);
+    onData([]);
+    onError?.(new Error('Live team plans are unavailable because Firebase is not configured for this app build.'));
     return () => undefined;
   }
 

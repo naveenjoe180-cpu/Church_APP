@@ -44,14 +44,8 @@ import {
 } from './services/auth';
 import {
   churches as mockChurches,
-  churchAnnouncements as mockAnnouncements,
-  churchEvents as mockEvents,
-  members as mockMembers,
-  pendingAccessRequests as mockAccessRequests,
-  pendingPrayerRequests as mockPrayerRequests,
   roleLabels,
   roleMatrix,
-  volunteerAssignments as mockAssignments,
 } from './data/mockData';
 import type {
   AccessRequest,
@@ -1319,16 +1313,17 @@ function App() {
   const [isResolvingAdminProfile, setIsResolvingAdminProfile] = useState(false);
   const [churches, setChurches] = useState<Church[]>(mockChurches);
   const [selectedChurchId, setSelectedChurchId] = useState('');
-  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>(mockAccessRequests);
-  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>(mockPrayerRequests);
-  const [announcements, setAnnouncements] = useState<ChurchAnnouncement[]>(mockAnnouncements);
-  const [events, setEvents] = useState<ChurchEventItem[]>(mockEvents);
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
+  const [announcements, setAnnouncements] = useState<ChurchAnnouncement[]>([]);
+  const [events, setEvents] = useState<ChurchEventItem[]>([]);
   const [commonMeetingCancellationKeys, setCommonMeetingCancellationKeys] = useState<string[]>([]);
   const [churchSpecificMeetingCancellationKeys, setChurchSpecificMeetingCancellationKeys] = useState<string[]>([]);
-  const [members, setMembers] = useState<MemberRecord[]>(mockMembers);
-  const [assignments, setAssignments] = useState<VolunteerAssignment[]>(mockAssignments);
-  const [selectedRequestId, setSelectedRequestId] = useState(mockAccessRequests[0]?.id ?? '');
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [assignments, setAssignments] = useState<VolunteerAssignment[]>([]);
+  const [selectedRequestId, setSelectedRequestId] = useState('');
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+  const [rejectionReasonDraft, setRejectionReasonDraft] = useState('');
   const [updateMessage, setUpdateMessage] = useState('');
   const [approvalSearch, setApprovalSearch] = useState('');
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'all' | AccessRequest['status']>('pending');
@@ -1381,7 +1376,9 @@ function App() {
     scopeType: 'church' as 'church' | 'network',
     title: '',
     description: '',
+    locationMode: 'church' as 'church' | 'online' | 'other',
     location: mockChurches[0]?.address ?? '',
+    customLocation: '',
     startAt: '',
     endAt: '',
     posterUrl: '',
@@ -1442,6 +1439,10 @@ function App() {
     [scopedEvents],
   );
   const scopedMembers = useMemo(() => members.filter((member) => !selectedChurch || member.churchId === selectedChurch.id), [members, selectedChurch]);
+  const membersWithoutTeamCount = useMemo(
+    () => scopedMembers.filter((member) => member.teamNames.length === 0).length,
+    [scopedMembers],
+  );
   const scopedAssignments = useMemo(() => assignments.filter((assignment) => !selectedChurch || assignment.churchId === selectedChurch.id), [assignments, selectedChurch]);
   const filteredRequests = useMemo(() => {
     const searchTerm = approvalSearch.trim().toLowerCase();
@@ -1498,6 +1499,9 @@ function App() {
     ?? filteredRequests[0]
     ?? accessRequests.find((request) => request.id === selectedRequestId)
     ?? null;
+  useEffect(() => {
+    setRejectionReasonDraft(selectedRequest?.rejectionReason ?? '');
+  }, [selectedRequest?.id, selectedRequest?.rejectionReason]);
   const canManagePlanningStructure = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canEditServiceOrder = canManagePlanningStructure;
   const canPlanAllTeams = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
@@ -1511,8 +1515,9 @@ function App() {
   const canPublishUpdates = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canPublishEvents = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canPublishCommonEvents = adminProfile.roleKey === 'networkSuperAdmin';
+  const updatesPublishNote = canPublishUpdates ? '' : 'Only Church Admin, Pastor, and Super Admin can publish announcements and events.';
   const effectiveEventScopeType = canPublishCommonEvents ? eventForm.scopeType : 'church';
-  const canAccessMemberSetup = adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
+  const canAccessMemberSetup = adminProfile.roleKey === 'networkSuperAdmin' || adminProfile.roleKey === 'churchAdmin' || adminProfile.roleKey === 'pastor';
   const canCancelPublishedEvent = (event: ChurchEventItem) =>
     event.scopeType === 'network' || event.churchId === 'network'
       ? adminProfile.roleKey === 'networkSuperAdmin'
@@ -1888,7 +1893,11 @@ function App() {
     setExpandedArchiveActivityKeys({});
     setEventForm((current) => ({
       ...current,
-      location: selectedChurch.address,
+      location: current.locationMode === 'other'
+        ? current.location
+        : current.locationMode === 'online'
+          ? 'Online'
+          : selectedChurch.address,
     }));
     setAuditEntries(loadAuditEntries(selectedChurch.id));
   }, [selectedChurch]);
@@ -1912,11 +1921,11 @@ function App() {
   useEffect(() => {
     const activeChurchId = selectedChurch?.id ?? null;
     const accessRequestScopeChurchId = adminProfile.roleKey === 'networkSuperAdmin' ? null : activeChurchId;
-    const unsubscribeRequests = subscribeToAccessRequests(accessRequestScopeChurchId, setAccessRequests, () => setAccessRequests(mockAccessRequests));
-    const unsubscribePrayers = subscribeToPrayerRequests(activeChurchId, setPrayerRequests, () => setPrayerRequests(mockPrayerRequests));
+    const unsubscribeRequests = subscribeToAccessRequests(accessRequestScopeChurchId, setAccessRequests, () => setAccessRequests([]));
+    const unsubscribePrayers = subscribeToPrayerRequests(activeChurchId, setPrayerRequests, () => setPrayerRequests([]));
     const unsubscribeMembers = subscribeToMembers(activeChurchId, setMembers, () => setMembers([]));
     const unsubscribeAnnouncements = activeChurchId
-      ? subscribeToAnnouncements(activeChurchId, setAnnouncements, () => setAnnouncements(mockAnnouncements))
+      ? subscribeToAnnouncements(activeChurchId, setAnnouncements, () => setAnnouncements([]))
       : () => undefined;
     const unsubscribeEvents = activeChurchId
       ? subscribeToEvents(activeChurchId, setEvents)
@@ -1927,7 +1936,7 @@ function App() {
     const unsubscribeChurchSpecificMeetingCancellations = activeChurchId
       ? subscribeToChurchSpecificMeetingCancellations(activeChurchId, setChurchSpecificMeetingCancellationKeys, () => setChurchSpecificMeetingCancellationKeys([]))
       : () => undefined;
-    const unsubscribeAssignments = subscribeToVolunteerAssignments(activeChurchId, null, setAssignments, () => setAssignments(mockAssignments));
+    const unsubscribeAssignments = subscribeToVolunteerAssignments(activeChurchId, null, setAssignments, () => setAssignments([]));
 
     return () => {
       unsubscribeRequests();
@@ -2116,7 +2125,11 @@ function App() {
     setAuthError('');
   };
 
-  const handleApproveRequest = async (nextStatus: 'approved' | 'rejected', requestsOverride?: AccessRequest[]) => {
+  const handleApproveRequest = async (
+    nextStatus: 'approved' | 'rejected',
+    requestsOverride?: AccessRequest[],
+    rejectionReasonOverride?: string,
+  ) => {
     if (!canReviewApprovals) {
       setUpdateMessage('Only super admins, church admins, and pastors can review approvals.');
       return;
@@ -2127,15 +2140,37 @@ function App() {
       return;
     }
 
+    let resolvedRejectionReason = '';
+    if (nextStatus === 'rejected') {
+      resolvedRejectionReason = (rejectionReasonOverride ?? rejectionReasonDraft).trim();
+      if (!resolvedRejectionReason && typeof window !== 'undefined') {
+        resolvedRejectionReason = window.prompt('Enter a rejection reason so the member understands what needs to be corrected:', '')?.trim() ?? '';
+      }
+
+      if (!resolvedRejectionReason) {
+        setUpdateMessage('Add a rejection reason before rejecting the request.');
+        return;
+      }
+    }
+
     try {
       if (isFirebaseConfigured) {
           await Promise.all(
-            requestsToUpdate.map((request) => updateAccessRequestStatus(request, nextStatus)),
+            requestsToUpdate.map((request) => updateAccessRequestStatus(request, nextStatus, resolvedRejectionReason)),
           );
       }
       const requestIds = new Set(requestsToUpdate.map((request) => request.id));
-      setAccessRequests((current) => current.map((request) => requestIds.has(request.id) ? { ...request, status: nextStatus } : request));
+      setAccessRequests((current) => current.map((request) => requestIds.has(request.id)
+        ? {
+            ...request,
+            status: nextStatus,
+            rejectionReason: nextStatus === 'rejected' ? resolvedRejectionReason : undefined,
+          }
+        : request));
       setSelectedRequestIds([]);
+      if (nextStatus === 'approved') {
+        setRejectionReasonDraft('');
+      }
       const affectedNames = requestsToUpdate.map((request) => request.fullName).join(', ');
       setUpdateMessage(
         nextStatus === 'approved'
@@ -2148,7 +2183,9 @@ function App() {
           entityType: 'approval',
           actionLabel: nextStatus === 'approved' ? 'Approved request' : 'Rejected request',
           targetLabel: request.fullName,
-          summary: `${roleLabels[adminProfile.roleKey]} ${adminSession?.email ?? 'admin'} marked the access request as ${nextStatus}.`,
+          summary: nextStatus === 'rejected'
+            ? `${roleLabels[adminProfile.roleKey]} ${adminSession?.email ?? 'admin'} marked the access request as rejected with a reason for the member.`
+            : `${roleLabels[adminProfile.roleKey]} ${adminSession?.email ?? 'admin'} marked the access request as approved.`,
           actor: adminSession?.email ?? 'Church admin',
         })),
       );
@@ -2953,7 +2990,18 @@ function App() {
     }
     const eventChurchId = scopeType === 'network' ? 'network' : selectedChurch.id;
     const scopeLabel = scopeType === 'network' ? 'All churches' : selectedChurch.displayCity;
-    const location = eventForm.location || selectedChurch.address;
+    const location = (
+      eventForm.locationMode === 'online'
+        ? 'Online'
+        : eventForm.locationMode === 'other'
+          ? eventForm.customLocation.trim()
+          : selectedChurch.address
+    ).trim();
+
+    if (!location) {
+      setUpdateMessage('Choose the event venue before publishing.');
+      return;
+    }
 
     try {
       if (isFirebaseConfigured) {
@@ -2992,7 +3040,9 @@ function App() {
         scopeType: 'church',
         title: '',
         description: '',
+        locationMode: 'church',
         location: selectedChurch.address,
+        customLocation: '',
         startAt: '',
         endAt: '',
         posterUrl: '',
@@ -3058,6 +3108,13 @@ function App() {
       return;
     }
 
+    const confirmCancel = typeof window === 'undefined'
+      ? true
+      : window.confirm(`Are you sure you want to cancel ${meeting.title} on ${formatServiceDate(meeting.occurrenceDate)}?`);
+    if (!confirmCancel) {
+      return;
+    }
+
     try {
       if (isFirebaseConfigured) {
         await cancelCommonMeetingOccurrence({
@@ -3114,6 +3171,13 @@ function App() {
   const handleCancelChurchSpecificMeeting = async (meeting: ChurchSpecificMeetingOccurrence) => {
     if (!selectedChurch || !canManageCommonMeetings) {
       setUpdateMessage('Only super admins, church admins, and pastors can cancel church-specific meetings.');
+      return;
+    }
+
+    const confirmCancel = typeof window === 'undefined'
+      ? true
+      : window.confirm(`Are you sure you want to cancel ${meeting.title} on ${formatServiceDate(meeting.occurrenceDate)}?`);
+    if (!confirmCancel) {
       return;
     }
 
@@ -3533,7 +3597,7 @@ function App() {
               <h3>What needs attention next</h3>
               <div className="detail-block"><strong>Approval queue</strong><span>{scopedRequests.filter((request) => request.status === 'pending').length > 0 ? 'Review new access requests soon.' : 'No one is waiting in the onboarding queue.'}</span></div>
               <div className="detail-block"><strong>Sunday readiness</strong><span>{uncoveredRequirementsCount > 0 ? `${uncoveredRequirementsCount} Sunday role${uncoveredRequirementsCount > 1 ? 's are' : ' is'} still unfilled.` : 'All planned Sunday roles currently have someone assigned.'}</span></div>
-              <div className="detail-block"><strong>Member follow-up</strong><span>{scopedMembers.filter((member) => member.teamNames.length === 0).length > 0 ? `${scopedMembers.filter((member) => member.teamNames.length === 0).length} member${scopedMembers.filter((member) => member.teamNames.length === 0).length > 1 ? 's have' : ' has'} not been assigned to a team yet.` : 'Managed members are assigned and ready for Sunday planning.'}</span></div>
+              <div className="detail-block"><strong>Member follow-up</strong><span>{membersWithoutTeamCount > 0 ? `${membersWithoutTeamCount} member${membersWithoutTeamCount > 1 ? 's have' : ' has'} not been assigned to a team yet.` : 'Managed members are assigned and ready for Sunday planning.'}</span></div>
             </article>
             <article className="wide-card">
               <div className="section-heading">
@@ -3641,6 +3705,7 @@ function App() {
                       <span className={`status-badge ${request.status}`}>{request.status}</span>
                     </div>
                     <p>{request.note}</p>
+                    {request.status === 'rejected' && request.rejectionReason ? <p className="muted-line">Reason: {request.rejectionReason}</p> : null}
                     <p className="muted-line">{request.email} | {request.requestedAt}</p>
                     <div className="chip-row">
                       {request.requestedRoles.map((role) => <span key={role} className="mini-chip">{roleLabels[role]}</span>)}
@@ -3662,6 +3727,23 @@ function App() {
                     <div className="chip-row">{selectedRequest.requestedRoles.map((role) => <span key={role} className="mini-chip">{roleLabels[role]}</span>)}</div>
                   </div>
                   <div className="detail-block"><strong>Request note</strong><span>{selectedRequest.note}</span></div>
+                  <div className="detail-block">
+                    <strong>Rejection reason</strong>
+                    <textarea
+                      className="auth-input"
+                      rows={4}
+                      value={rejectionReasonDraft}
+                      onChange={(event) => setRejectionReasonDraft(event.target.value)}
+                      placeholder="Explain what the member should correct before submitting again"
+                      disabled={!canReviewApprovals}
+                    />
+                  </div>
+                  {selectedRequest.status === 'rejected' && selectedRequest.rejectionReason ? (
+                    <div className="detail-block">
+                      <strong>Current rejection note</strong>
+                      <span>{selectedRequest.rejectionReason}</span>
+                    </div>
+                  ) : null}
                   <div className="action-stack horizontal">
                     <button type="button" className="action-button approve" onClick={() => void handleApproveRequest('approved')} disabled={!canReviewApprovals || selectedRequest.status !== 'pending'}>Approve</button>
                     <button type="button" className="action-button reject" onClick={() => void handleApproveRequest('rejected')} disabled={!canReviewApprovals || selectedRequest.status !== 'pending'}>Reject</button>
@@ -4455,6 +4537,7 @@ function App() {
             <article className="composer-card updates-card event-management-card">
               <p className="panel-kicker">Announcements</p>
               <h3>Announcements for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
+              {!canPublishUpdates ? <p className="detail-copy event-scope-note">{updatesPublishNote}</p> : null}
               <div className="form-grid">
                 <input className="auth-input" type="text" value={announcementForm.title} onChange={(event) => setAnnouncementForm((current) => ({ ...current, title: event.target.value }))} placeholder="Announcement title" />
                 <textarea className="auth-input content-area" value={announcementForm.body} onChange={(event) => setAnnouncementForm((current) => ({ ...current, body: event.target.value }))} placeholder="Announcement body" />
@@ -4491,6 +4574,7 @@ function App() {
             <article className="composer-card updates-card event-management-card">
               <p className="panel-kicker">Events</p>
               <h3>Publish events for {selectedChurch?.displayCity ?? 'the selected church'}</h3>
+              {!canPublishEvents ? <p className="detail-copy event-scope-note">{updatesPublishNote}</p> : null}
               <div className="form-grid">
                 <div className="form-row event-scope-row">
                   <label className="toggle-row">
@@ -4501,7 +4585,10 @@ function App() {
                         ...current,
                         scopeType: 'church',
                         isPublic: false,
-                        location: current.location || (selectedChurch?.address ?? ''),
+                        locationMode: current.locationMode === 'other' ? 'other' : 'church',
+                        location: current.locationMode === 'other'
+                          ? current.customLocation
+                          : (selectedChurch?.address ?? ''),
                       }))}
                     />
                     Church specific event
@@ -4511,7 +4598,13 @@ function App() {
                       <input
                         type="radio"
                         checked={effectiveEventScopeType === 'network'}
-                        onChange={() => setEventForm((current) => ({ ...current, scopeType: 'network', isPublic: true }))}
+                        onChange={() => setEventForm((current) => ({
+                          ...current,
+                          scopeType: 'network',
+                          isPublic: true,
+                          locationMode: current.locationMode === 'other' ? 'other' : 'online',
+                          location: current.locationMode === 'other' ? current.customLocation : 'Online',
+                        }))}
                       />
                       Common event across all churches
                     </label>
@@ -4525,7 +4618,65 @@ function App() {
                   <input className="auth-input" type="datetime-local" value={eventForm.startAt} onChange={(event) => setEventForm((current) => ({ ...current, startAt: event.target.value }))} />
                   <input className="auth-input" type="datetime-local" value={eventForm.endAt} onChange={(event) => setEventForm((current) => ({ ...current, endAt: event.target.value }))} />
                 </div>
-                <input className="auth-input" type="text" value={eventForm.location} onChange={(event) => setEventForm((current) => ({ ...current, location: event.target.value }))} placeholder={effectiveEventScopeType === 'network' ? 'Online / host location' : 'Church address'} />
+                <div className="form-row event-location-row">
+                  <label className="toggle-row">
+                    <input
+                      type="radio"
+                      checked={eventForm.locationMode === 'church'}
+                      onChange={() => setEventForm((current) => ({
+                        ...current,
+                        locationMode: 'church',
+                        location: selectedChurch?.address ?? '',
+                      }))}
+                    />
+                    Church location
+                  </label>
+                  <label className="toggle-row">
+                    <input
+                      type="radio"
+                      checked={eventForm.locationMode === 'online'}
+                      onChange={() => setEventForm((current) => ({
+                        ...current,
+                        locationMode: 'online',
+                        location: 'Online',
+                      }))}
+                    />
+                    Online
+                  </label>
+                  <label className="toggle-row">
+                    <input
+                      type="radio"
+                      checked={eventForm.locationMode === 'other'}
+                      onChange={() => setEventForm((current) => ({
+                        ...current,
+                        locationMode: 'other',
+                        customLocation: current.customLocation,
+                        location: current.customLocation,
+                      }))}
+                    />
+                    Other
+                  </label>
+                </div>
+                {eventForm.locationMode === 'other' ? (
+                  <input
+                    className="auth-input"
+                    type="text"
+                    value={eventForm.customLocation}
+                    onChange={(event) => setEventForm((current) => ({
+                      ...current,
+                      customLocation: event.target.value,
+                      location: event.target.value,
+                    }))}
+                    placeholder="Specify venue"
+                  />
+                ) : (
+                  <input
+                    className="auth-input"
+                    type="text"
+                    value={eventForm.locationMode === 'church' ? (selectedChurch?.address ?? '') : 'Online'}
+                    readOnly
+                  />
+                )}
                 <div className="form-row event-poster-row">
                   <label className="event-poster-upload">
                     <span>Upload poster</span>

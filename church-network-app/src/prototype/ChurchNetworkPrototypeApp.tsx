@@ -20,10 +20,6 @@ import { isFirebaseConfigured } from '../config/firebase';
 import {
   type NetworkChurch,
   networkChurches,
-  privateModules,
-  publicHighlights,
-  roleSummary,
-  supportedTeams,
 } from '../data/prototype';
 import { createAccessRequest } from '../services/accessRequests';
 import {
@@ -1167,7 +1163,12 @@ export function ChurchNetworkPrototypeApp() {
                 </Text>
               </View>
               <View style={[styles.memberHeaderModeBadge, isCompactMemberHeader && styles.memberHeaderModeBadgeCompact]}>
-                <Text style={[styles.memberHeaderModeBadgeText, isCompactMemberHeader && styles.memberHeaderModeBadgeTextCompact]}>{roleModeLabel}</Text>
+                <Text
+                  style={[styles.memberHeaderModeBadgeText, isCompactMemberHeader && styles.memberHeaderModeBadgeTextCompact]}
+                  numberOfLines={isCompactMemberHeader ? 2 : 1}
+                >
+                  {roleModeLabel}
+                </Text>
               </View>
               <Pressable onPress={resetDemo} style={[styles.memberHeaderSignOutButton, isCompactMemberHeader && styles.memberHeaderSignOutButtonCompact]}>
                 <Text style={[styles.memberHeaderSignOutButtonText, isCompactMemberHeader && styles.memberHeaderSignOutButtonTextCompact]}>Sign Out</Text>
@@ -1184,7 +1185,12 @@ export function ChurchNetworkPrototypeApp() {
             </View>
             <View style={[styles.memberHeaderActions, isCompactMemberHeader && styles.memberHeaderActionsCompact]}>
               <View style={[styles.memberHeaderModeBadge, isCompactMemberHeader && styles.memberHeaderModeBadgeCompact]}>
-                <Text style={[styles.memberHeaderModeBadgeText, isCompactMemberHeader && styles.memberHeaderModeBadgeTextCompact]}>{roleModeLabel}</Text>
+                <Text
+                  style={[styles.memberHeaderModeBadgeText, isCompactMemberHeader && styles.memberHeaderModeBadgeTextCompact]}
+                  numberOfLines={isCompactMemberHeader ? 2 : 1}
+                >
+                  {roleModeLabel}
+                </Text>
               </View>
               {authSession ? (
                 <Pressable onPress={resetDemo} style={[styles.memberHeaderSignOutButton, isCompactMemberHeader && styles.memberHeaderSignOutButtonCompact]}>
@@ -1353,7 +1359,7 @@ export function ChurchNetworkPrototypeApp() {
           </View>
         ) : null}
         {activeAppTab === 'access' && stage === 'profile' ? <View onLayout={registerContentAnchor('access:profile')}><ProfileScreen churches={churches} form={requestForm} selectedChurchName={churches.find((church) => church.id === requestForm.requestedChurchId)?.name ?? ''} validationMessage={validationMessage} isSubmitting={isSubmitting} authSession={authSession} onBack={() => setStage('signin')} onChange={setRequestForm} onSubmit={() => void submitRequest()} /></View> : null}
-        {activeAppTab === 'access' && stage === 'pending' ? <View onLayout={registerContentAnchor('access:pending')}><PendingApprovalScreen approvalStatus={(forcePendingRequestState && memberProfile?.approvalStatus !== 'approved') ? 'pending' : (memberProfile?.approvalStatus ?? 'pending')} churchName={selectedChurch.name} email={requestForm.email} requestReference={requestReference} notificationStatusMessage={notificationStatusMessage} onBackToGuest={resetDemo} onReturnToProfile={() => setStage('profile')} /></View> : null}
+        {activeAppTab === 'access' && stage === 'pending' ? <View onLayout={registerContentAnchor('access:pending')}><PendingApprovalScreen approvalStatus={(forcePendingRequestState && memberProfile?.approvalStatus !== 'approved') ? 'pending' : (memberProfile?.approvalStatus ?? 'pending')} rejectionReason={(forcePendingRequestState && memberProfile?.approvalStatus !== 'approved') ? '' : (memberProfile?.rejectionReason ?? '')} churchName={selectedChurch.name} email={requestForm.email} requestReference={requestReference} notificationStatusMessage={notificationStatusMessage} onBackToGuest={resetDemo} onReturnToProfile={() => setStage('profile')} /></View> : null}
         {activeAppTab === 'member' && stage === 'approved' ? (
           <ApprovedPreviewScreen
             form={requestForm}
@@ -1564,6 +1570,7 @@ function ProfileScreen({
 
 function PendingApprovalScreen({
   approvalStatus,
+  rejectionReason,
   churchName,
   email,
   requestReference,
@@ -1572,6 +1579,7 @@ function PendingApprovalScreen({
   onReturnToProfile,
 }: {
   approvalStatus: 'pending' | 'approved' | 'rejected';
+  rejectionReason: string;
   churchName: string;
   email: string;
   requestReference: string | null;
@@ -1601,6 +1609,11 @@ function PendingApprovalScreen({
         <Text style={styles.cardBody}>Signed in with: Google</Text>
         <Text style={styles.cardBody}>Email: {email}</Text>
         {requestReference ? <Text style={styles.cardBody}>Request ID: {requestReference}</Text> : null}
+        {isRejected && rejectionReason ? (
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeText}>Reason from admin: {rejectionReason}</Text>
+          </View>
+        ) : null}
         <View style={styles.noticeBox}>
           <Text style={styles.noticeText}>Request is sent to the church admin for Approval.</Text>
         </View>
@@ -1769,6 +1782,17 @@ function ApprovedPreviewScreen({
         return groups;
       }, {}),
     [selectedTeamPlanDate, teamPlanAssignments, visibleTeamNames],
+  );
+  const teamPlanSummaries = useMemo(
+    () =>
+      visibleTeamNames.reduce<Record<string, string>>((summaries, teamName) => {
+        const plannedCount = assignmentsByVisibleTeam[teamName]?.length ?? 0;
+        summaries[teamName] = plannedCount > 0
+          ? `${plannedCount} role${plannedCount === 1 ? '' : 's'} planned`
+          : 'No plan yet';
+        return summaries;
+      }, {}),
+    [assignmentsByVisibleTeam, visibleTeamNames],
   );
   const activeTeamPlanName = selectedTeamPlanTeam && visibleTeamNames.includes(selectedTeamPlanTeam)
     ? selectedTeamPlanTeam
@@ -1961,7 +1985,11 @@ function ApprovedPreviewScreen({
                   </View>
                 ))
               ) : (
-                <Text style={styles.emptyState}>No announcements are active for {church.displayCity} right now. New church updates will appear here as soon as leaders publish them.</Text>
+                <Text style={styles.emptyState}>
+                  {contentNotice
+                    ? `Announcements could not be loaded right now for ${church.displayCity}. Please check your connection and try again.`
+                    : `No announcements are active for ${church.displayCity} right now. New church updates will appear here as soon as leaders publish them.`}
+                </Text>
               )}
             </View>
           </View>
@@ -1988,7 +2016,11 @@ function ApprovedPreviewScreen({
                   </View>
                 ))
               ) : (
-                <Text style={styles.emptyState}>No upcoming events are scheduled for {church.displayCity} or the wider network yet. When church admins publish new gatherings, they will appear here with calendar actions.</Text>
+                <Text style={styles.emptyState}>
+                  {contentNotice
+                    ? `Events could not be loaded right now for ${church.displayCity}. Please check your connection and try again.`
+                    : `No upcoming events are scheduled for ${church.displayCity} or the wider network yet. When church admins publish new gatherings, they will appear here with calendar actions.`}
+                </Text>
               )}
             </View>
           </View>
@@ -2286,9 +2318,16 @@ function ApprovedPreviewScreen({
                               styles.teamPlanTeamSwitchButtonText,
                               activeTeamPlanName === teamName && styles.teamPlanTeamSwitchButtonTextActive,
                             ]}
-                            numberOfLines={1}
                           >
                             {teamName}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.teamPlanTeamSwitchSummary,
+                              activeTeamPlanName === teamName && styles.teamPlanTeamSwitchSummaryActive,
+                            ]}
+                          >
+                            {teamPlanSummaries[teamName]}
                           </Text>
                         </Pressable>
                       ))}
@@ -2321,7 +2360,9 @@ function ApprovedPreviewScreen({
                   </View>
                 ) : (
                   <Text style={styles.emptyState}>
-                    No teams are currently available for this view in {church.displayCity}.
+                    {teamPlanNotice
+                      ? `Team plans could not be loaded right now for ${church.displayCity}. Please check your connection and try again.`
+                      : `No teams are currently available for this view in ${church.displayCity}.`}
                   </Text>
                 )}
               </View>
@@ -2367,7 +2408,11 @@ function ApprovedPreviewScreen({
                 </View>
               ))
             ) : (
-              <Text style={styles.emptyState}>No Sunday assignments are visible yet. When your church schedules the coming service, this page will group your roles by activity and Sunday.</Text>
+              <Text style={styles.emptyState}>
+                {assignmentNotice
+                  ? 'Your Sunday assignments could not be fully loaded right now. Please check your connection and try again.'
+                  : 'No Sunday assignments are visible yet. When your church schedules the coming service, this page will group your roles by activity and Sunday.'}
+              </Text>
             )}
           </View>
           <View style={styles.card}>
@@ -3561,15 +3606,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     lineHeight: 16,
+    textAlign: 'center',
   },
   memberHeaderModeBadgeCompact: {
     paddingHorizontal: 10,
     paddingVertical: 8,
     justifyContent: 'center',
+    flexShrink: 1,
+    minWidth: 0,
+    flexBasis: 82,
   },
   memberHeaderModeBadgeTextCompact: {
     fontSize: 11,
     lineHeight: 14,
+    textAlign: 'center',
   },
   memberHeaderSignOutButton: {
     backgroundColor: colors.midnight,
@@ -3913,10 +3963,12 @@ const styles = StyleSheet.create({
   teamPlanTeamSwitchWrap: { backgroundColor: colors.parchment, borderRadius: 16, borderWidth: 1, borderColor: colors.softLine, padding: 12, gap: 10 },
   teamPlanTeamSwitchLabel: { color: colors.midnight, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   teamPlanTeamSwitchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  teamPlanTeamSwitchButton: { backgroundColor: colors.parchment, borderRadius: 999, borderWidth: 1, borderColor: colors.softLine, paddingHorizontal: 10, paddingVertical: 7, maxWidth: '100%' },
+  teamPlanTeamSwitchButton: { backgroundColor: colors.parchment, borderRadius: 18, borderWidth: 1, borderColor: colors.softLine, paddingHorizontal: 12, paddingVertical: 9, maxWidth: '100%', minWidth: 116, gap: 2 },
   teamPlanTeamSwitchButtonActive: { backgroundColor: colors.teal, borderColor: colors.teal },
   teamPlanTeamSwitchButtonText: { color: colors.midnight, fontSize: 12, fontWeight: '800' },
   teamPlanTeamSwitchButtonTextActive: { color: colors.white },
+  teamPlanTeamSwitchSummary: { color: colors.muted, fontSize: 11, lineHeight: 14 },
+  teamPlanTeamSwitchSummaryActive: { color: 'rgba(255,255,255,0.82)' },
   contentList: { gap: 14 },
   contentItem: { paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.softLine },
   contentItemFirst: { paddingTop: 0, borderTopWidth: 0 },

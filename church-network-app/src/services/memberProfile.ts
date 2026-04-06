@@ -10,6 +10,7 @@ export type MemberProfile = {
   email: string;
   displayName: string;
   approvalStatus: ApprovalStatus;
+  rejectionReason: string;
   primaryChurchId: string;
   pendingChurchId: string;
   phoneNumber: string;
@@ -90,7 +91,7 @@ function normalizeError(error: FirestoreError | Error | unknown, fallback: strin
     return error;
   }
 
-  return new Error(fallback);
+  return new Error('Your member profile could not be loaded right now. Check your internet connection and try signing in again.');
 }
 
 export function subscribeToMemberProfile(
@@ -122,6 +123,7 @@ export function subscribeToMemberProfile(
           rawValue.approvalStatus === 'approved' || rawValue.approvalStatus === 'rejected' || rawValue.approvalStatus === 'pending'
             ? rawValue.approvalStatus
             : 'pending',
+        rejectionReason: normalizeString(rawValue.rejectionReason),
         primaryChurchId: normalizeString(rawValue.primaryChurchId),
         pendingChurchId: normalizeString(rawValue.pendingChurchId),
         phoneNumber: normalizeString(rawValue.phoneNumber),

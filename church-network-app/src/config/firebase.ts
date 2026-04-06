@@ -1,6 +1,7 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import Constants from 'expo-constants';
 
 const firebaseConfigKeys = [
   'apiKey',
@@ -29,9 +30,15 @@ export const firebaseConfigStatus = firebaseConfigKeys.map((key) => ({
 
 export const isFirebaseConfigured = firebaseConfigStatus.every((item) => item.configured);
 
+const easProjectId =
+  process.env.EXPO_PUBLIC_EXPO_PROJECT_ID
+  || Constants.expoConfig?.extra?.eas?.projectId
+  || Constants.easConfig?.projectId
+  || '';
+
 export const notificationConfig = {
   webVapidKey: process.env.EXPO_PUBLIC_FIREBASE_VAPID_KEY ?? '',
-  expoProjectId: process.env.EXPO_PUBLIC_EXPO_PROJECT_ID ?? '',
+  expoProjectId: easProjectId,
 };
 
 export const googleAuthConfig = {

@@ -1,0 +1,148 @@
+{
+  "generatedAt": "2026-04-06T19:23:50.518Z",
+  "summary": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0
+  },
+  "results": [
+    {
+      "id": "BROWSER-001",
+      "area": "Browser Smoke",
+      "requirement": "User app should load the guest shell on desktop with the expected top-level navigation.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless.",
+        "Open the built user app on a local static server.",
+        "Wait for the guest shell to render.",
+        "Verify Bethel Connect branding plus Access and Explore navigation are visible.",
+        "Fail if a page crash occurs."
+      ],
+      "notes": [
+        "Guest desktop shell loaded successfully."
+      ]
+    },
+    {
+      "id": "BROWSER-002",
+      "area": "Browser Smoke",
+      "requirement": "User app should keep the guest top strip and primary tabs visible in a mobile-sized viewport.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless in a mobile-sized context.",
+        "Open the built user app.",
+        "Wait for the guest shell to render.",
+        "Verify Bethel Connect branding, Access, and Explore are visible in the mobile layout."
+      ],
+      "notes": [
+        "Guest mobile shell rendered successfully."
+      ]
+    },
+    {
+      "id": "BROWSER-003",
+      "area": "Offline / Resilience",
+      "requirement": "User app should still render a usable guest shell when Firebase and Google backend requests are blocked.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless.",
+        "Block outbound Firebase and Google API requests in the browser context while leaving localhost assets available.",
+        "Open the built user app.",
+        "Verify the guest shell still renders and does not crash."
+      ],
+      "notes": [
+        "User app remained usable with backend requests blocked.",
+        "Console errors captured: 5"
+      ]
+    },
+    {
+      "id": "BROWSER-004",
+      "area": "Runtime Stability",
+      "requirement": "User app should survive repeated desktop reloads without crashing the guest shell.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless.",
+        "Open the built user app.",
+        "Reload the page five times.",
+        "Verify the guest shell remains visible after each reload and no page crash occurs."
+      ],
+      "notes": [
+        "User app survived repeated reloads without page crashes."
+      ]
+    },
+    {
+      "id": "BROWSER-005",
+      "area": "Browser Smoke",
+      "requirement": "Admin app should load the signed-out shell on desktop with the expected branding and sign-in action.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless.",
+        "Open the built admin app on a local static server under /admin/.",
+        "Wait for the signed-out shell to render.",
+        "Verify Bethel Connect Admin and Continue With Google are visible."
+      ],
+      "notes": [
+        "Admin desktop sign-in shell loaded successfully."
+      ]
+    },
+    {
+      "id": "BROWSER-006",
+      "area": "Browser Smoke",
+      "requirement": "Admin app should render the signed-out shell in a mobile-sized viewport.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless in a mobile-sized context.",
+        "Open the built admin app.",
+        "Wait for the signed-out shell to render.",
+        "Verify Bethel Connect Admin remains visible in the mobile layout."
+      ],
+      "notes": [
+        "Admin mobile sign-in shell loaded successfully."
+      ]
+    },
+    {
+      "id": "BROWSER-007",
+      "area": "Offline / Resilience",
+      "requirement": "Admin app should still render a usable signed-out shell when Firebase and Google backend requests are blocked.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless.",
+        "Block outbound Firebase and Google API requests while leaving localhost assets available.",
+        "Open the built admin app.",
+        "Verify the sign-in shell still renders and does not crash."
+      ],
+      "notes": [
+        "Admin app remained usable with backend requests blocked.",
+        "Console errors captured: 7"
+      ]
+    },
+    {
+      "id": "BROWSER-008",
+      "area": "Runtime Stability",
+      "requirement": "Admin app should survive repeated reloads without crashing the signed-out shell.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless.",
+        "Open the built admin app.",
+        "Reload the page five times.",
+        "Verify the signed-out shell remains visible after each reload and no page crash occurs."
+      ],
+      "notes": [
+        "Admin app survived repeated reloads without page crashes."
+      ]
+    },
+    {
+      "id": "BROWSER-009",
+      "area": "Concurrency Smoke",
+      "requirement": "User and admin shells should load correctly when multiple browser pages open in parallel.",
+      "status": "PASS",
+      "steps": [
+        "Launch Microsoft Edge headless.",
+        "Open three user-app pages and three admin-app pages in parallel.",
+        "Wait for the expected shell text in each page.",
+        "Verify no page crashes occur during the parallel load."
+      ],
+      "notes": [
+        "Parallel user/admin shell loading completed without page crashes."
+      ]
+    }
+  ]
+}
