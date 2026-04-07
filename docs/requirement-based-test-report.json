@@ -1,0 +1,238 @@
+{
+  "generatedAt": "2026-04-06T19:00:59.822Z",
+  "summary": {
+    "total": 25,
+    "passed": 25,
+    "failed": 0
+  },
+  "requirementChecks": [
+    {
+      "id": "USER-REQ-001",
+      "area": "User App",
+      "requirement": "Guest mode title strip should use Bethel Connect branding.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-002",
+      "area": "User App",
+      "requirement": "Access request form should require a mobile number and show a clear prompt.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-003",
+      "area": "User App",
+      "requirement": "Access request form should clearly ask the user to select a church location.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-004",
+      "area": "User App",
+      "requirement": "Rejected requests should show the rejection reason to the user.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-005",
+      "area": "User App",
+      "requirement": "My Team Plan should exist as a dedicated tile.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-006",
+      "area": "User App",
+      "requirement": "My Team Plan should provide Current Sunday and Next Sunday selectors.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-007",
+      "area": "User App",
+      "requirement": "My Team Plan should provide explicit team navigation controls.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-008",
+      "area": "User App",
+      "requirement": "My Team Plan should show a No plan yet summary before the detail is opened.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-009",
+      "area": "User App",
+      "requirement": "The user app should surface clearer offline/error states for content and team plans.",
+      "status": "PASS",
+      "evidence": [
+        "ChurchNetworkPrototypeApp.tsx"
+      ]
+    },
+    {
+      "id": "USER-REQ-010",
+      "area": "User App",
+      "requirement": "Notification setup should not depend only on EXPO_PUBLIC_EXPO_PROJECT_ID.",
+      "status": "PASS",
+      "evidence": [
+        "firebase.ts"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-001",
+      "area": "Admin App",
+      "requirement": "Admin navigation should use Manage Members and Add Members and Teams labels.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-002",
+      "area": "Admin App",
+      "requirement": "Team Leader should not see Approval Queue or Manage Members in admin navigation.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-003",
+      "area": "Admin App",
+      "requirement": "Team Leader should not be able to publish announcements or events and should see a note.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-004",
+      "area": "Admin App",
+      "requirement": "Event cancellation should require confirmation and use Cancel Event wording.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-005",
+      "area": "Admin App",
+      "requirement": "Sunday service order should provide Current Sunday and Next Sunday selectors.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-006",
+      "area": "Admin App",
+      "requirement": "Rejecting an approval should require a rejection reason.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-007",
+      "area": "Admin App",
+      "requirement": "Deleting a member should require an explicit confirmation dialog.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "ADMIN-REQ-008",
+      "area": "Admin App",
+      "requirement": "Only super admins, church admins, pastors, and team leaders should be allowed into the admin app.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "BACKEND-REQ-001",
+      "area": "Backend",
+      "requirement": "Rejection reason should be persisted when an access request is rejected.",
+      "status": "PASS",
+      "evidence": [
+        "firebaseData.ts"
+      ]
+    },
+    {
+      "id": "BACKEND-REQ-002",
+      "area": "Backend",
+      "requirement": "Access requests should not allow self-elevation beyond member during signup.",
+      "status": "PASS",
+      "evidence": [
+        "accessRequests.ts",
+        "firestore.rules"
+      ]
+    },
+    {
+      "id": "BACKEND-REQ-003",
+      "area": "Backend",
+      "requirement": "Automated cleanup for expired content and old reminders should exist.",
+      "status": "PASS",
+      "evidence": [
+        "index.ts"
+      ]
+    },
+    {
+      "id": "BACKEND-REQ-004",
+      "area": "Backend",
+      "requirement": "Mobile notification device registration should write Expo device tokens to Firestore.",
+      "status": "PASS",
+      "evidence": [
+        "notifications.ts"
+      ]
+    }
+  ],
+  "qualityChecks": [
+    {
+      "id": "RISK-001",
+      "area": "Stability",
+      "requirement": "Admin app should not silently show mock access requests or assignments on live Firestore read failures.",
+      "status": "PASS",
+      "evidence": [
+        "App.tsx"
+      ]
+    },
+    {
+      "id": "RISK-002",
+      "area": "Stability",
+      "requirement": "User app should avoid showing mock announcements/events when Firebase is unavailable in production mode.",
+      "status": "PASS",
+      "evidence": [
+        "churchUpdates.ts"
+      ]
+    },
+    {
+      "id": "RISK-003",
+      "area": "Stability",
+      "requirement": "User app should avoid showing mock team plans when Firebase is unavailable in production mode.",
+      "status": "PASS",
+      "evidence": [
+        "teamAssignments.ts"
+      ]
+    }
+  ]
+}
